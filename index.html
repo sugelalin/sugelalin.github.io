@@ -206,12 +206,15 @@
 <p>添加type:</p>
 <figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="bullet">- </span>- -</span><br><span class="line">title: 文章标签</span><br><span class="line">date: 2020-06-04 16:00:00</span><br><span class="line">type: "tags"</span><br><span class="line"><span class="bullet">- </span>- -</span><br></pre></td></tr></table></figure>
 
-
 <h3 id="添加分类"><a href="#添加分类" class="headerlink" title="添加分类"></a>添加分类</h3><p>生成分类文件 source/categories/index.md</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo new page categories</span><br></pre></td></tr></table></figure>
 
 <p>添加type:</p>
 <figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="bullet">- </span>- -</span><br><span class="line">title: 文章分类</span><br><span class="line">date: 2020-06-04 16:00:00</span><br><span class="line">type: "categories"</span><br><span class="line"><span class="bullet">- </span>- -</span><br></pre></td></tr></table></figure>
+
+<p>修改文章生成的模板文件<br>修改 scaffolds/post.md ， 添加 tags 和 categories</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="bullet">- </span>- -</span><br><span class="line">title: &#123;&#123; title &#125;&#125;</span><br><span class="line">date: &#123;&#123; date &#125;&#125;</span><br><span class="line">tags: </span><br><span class="line">categories: </span><br><span class="line"><span class="bullet">- </span>- -</span><br></pre></td></tr></table></figure>
+
 
 <p>在文章中使用标签和分类</p>
 <figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="bullet">- </span>- -</span><br><span class="line">title: 文章标题</span><br><span class="line">date: 2020-06-04 16:00:00</span><br><span class="line">categories: </span><br><span class="line"><span class="bullet">- </span>前端</span><br><span class="line">tags: </span><br><span class="line"><span class="bullet">- </span>web前端</span><br><span class="line"><span class="bullet">- </span>hexo</span><br><span class="line"><span class="bullet">- </span>- -</span><br></pre></td></tr></table></figure>
@@ -241,7 +244,7 @@
 <h3 id="接入评论系统-valine"><a href="#接入评论系统-valine" class="headerlink" title="接入评论系统 -valine"></a>接入评论系统 -valine</h3><p><a href="https://valine.js.org/quickstart.html" target="_blank" rel="noopener">valine地址</a></p>
 <h3 id="其他"><a href="#其他" class="headerlink" title="其他"></a>其他</h3><p>a. 解决主题BUG：yilia主题分类跳转多了个 /<br>去掉 themes/yilia/layout/_partial/post/category.ejs 文件中，tag.path 前面的 /</p>
 <p>b. hexo 排序是依据文章的 date 降序排列；若date 值相同，就按文章文件的创建时间升序排列</p>
-<p>本文参考：<a href="https://www.jianshu.com/p/390f202c5b0e" target="_blank" rel="noopener">https://www.jianshu.com/p/390f202c5b0e</a></p>
+<p>本文参考：<br><a href="https://www.jianshu.com/p/390f202c5b0e" target="_blank" rel="noopener">https://www.jianshu.com/p/390f202c5b0e</a><br><a href="https://www.jianshu.com/p/e17711e44e00" target="_blank" rel="noopener">https://www.jianshu.com/p/e17711e44e00</a></p>
 
       
 
