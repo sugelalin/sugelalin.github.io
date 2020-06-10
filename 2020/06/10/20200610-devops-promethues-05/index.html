@@ -15,7 +15,7 @@
 <meta property="og:site_name" content="Allen">
 <meta property="og:description" content="Prometheus 告警概览用普罗米修斯发出警报分为两部分。  普罗米修斯服务器中的警报规则向警报管理器发送警报。 Alertmanager管理这些警报，包括静音、抑制、聚合和通过电子邮件、通话通知系统和聊天平台等方法发送通知。  设置警报和通知的主要步骤是：  设置和配置Alertmanager 配置普罗米修斯与警报管理器对话 在普罗米修斯中创建警报规则  告警管理器 Alertmanager">
 <meta property="article:published_time" content="2020-06-10T12:44:22.000Z">
-<meta property="article:modified_time" content="2020-06-10T12:45:19.861Z">
+<meta property="article:modified_time" content="2020-06-10T13:17:33.006Z">
 <meta property="article:author" content="yulin">
 <meta property="article:tag" content="Monitor">
 <meta property="article:tag" content="Prometheus">
@@ -223,7 +223,7 @@
 <p>线上Alertingmanager WebUI：</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http:&#x2F;&#x2F;outer-ip:6093&#x2F;alertmanager&#x2F;#&#x2F;alerts</span><br></pre></td></tr></table></figure>
 
-<p>关系<br>prometheus — 发送消息给 -—&gt; alertmanager — 调用第三方 -—&gt; dingding-webhook</p>
+<p>关系<br>prometheus-client — 采集信息 –&gt; prometheus-server — 根据rules，发送消息给 -—&gt; alertmanager — 调用第三方 -—&gt; dingding-webhook</p>
 <p><strong>参考链接</strong>：</p>
 <p><a href="https://www.cnblogs.com/g2thend/p/11865302.html" target="_blank" rel="noopener">https://www.cnblogs.com/g2thend/p/11865302.html</a><br><a href="https://www.jianshu.com/p/9fdd4f3497c6" target="_blank" rel="noopener">https://www.jianshu.com/p/9fdd4f3497c6</a><br><a href="https://theo.im/blog/2017/10/16/release-prometheus-alertmanager-webhook-for-dingtalk/" target="_blank" rel="noopener">https://theo.im/blog/2017/10/16/release-prometheus-alertmanager-webhook-for-dingtalk/</a></p>
 
@@ -344,6 +344,15 @@
 
   
 <nav id="article-nav">
+  
+    <a href="/2020/06/10/20200610-web-hexo-use/" id="article-nav-newer" class="article-nav-link-wrap">
+      <i class="icon-circle-left"></i>
+      <div class="article-nav-title">
+        
+          20200610-web-hexo-use
+        
+      </div>
+    </a>
   
   
     <a href="/2020/06/10/20200610-devops-promethues-04/" id="article-nav-older" class="article-nav-link-wrap">
@@ -474,15 +483,15 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
           <ul class="article-tag-list" q-show="showTags">
             
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color5">hexo</a>
-              </li>
-            
-              <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color3">Monitor</a>
               </li>
             
               <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color1">Prometheus</a>
+              </li>
+            
+              <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color5">hexo</a>
               </li>
             
             <div class="clearfix"></div>
