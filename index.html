@@ -151,6 +151,243 @@
           <div id="js-content" class="content-ll">
             
   
+    <article id="post-20200610-devops-promethues-04" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2020/06/10/20200610-devops-promethues-04/">Prometheus--（四）SpringBoot集成Prometheus</a>
+    </h1>
+  
+
+        
+        <a href="/2020/06/10/20200610-devops-promethues-04/" class="archive-article-date">
+  	<time datetime="2020-06-10T12:23:18.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-06-10</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="SpringBoot集成Prometheus"><a href="#SpringBoot集成Prometheus" class="headerlink" title="SpringBoot集成Prometheus"></a>SpringBoot集成Prometheus</h2><h3 id="依赖"><a href="#依赖" class="headerlink" title="依赖"></a>依赖</h3><p>在 pom.xml中添加依赖</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>org.springframework.boot<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>spring-boot-starter-actuator<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">version</span>&gt;</span>2.0.2.RELEASE<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>io.micrometer<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>micrometer-registry-prometheus<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">version</span>&gt;</span>1.0.4<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="配置-client"><a href="#配置-client" class="headerlink" title="配置 client"></a>配置 client</h3><p>在 application.properties 添加</p>
+<figure class="highlight properties"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">management.endpoints.web.exposure.include</span>=<span class="string">health,info,metrics,prometheus,restart,pause</span></span><br><span class="line"><span class="meta">management.endpoint.pause.enabled</span>=<span class="string">true</span></span><br><span class="line"><span class="meta">management.endpoint.restart.enabled</span>=<span class="string">true</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="启动-client-服务"><a href="#启动-client-服务" class="headerlink" title="启动 client 服务"></a>启动 client 服务</h3><h3 id="配置-Prometheus"><a href="#配置-Prometheus" class="headerlink" title="配置 Prometheus"></a>配置 Prometheus</h3><p>修改prometheus.yml，默认端口号对应application.yml的server.port，检查端口开放状态</p>
+<figure class="highlight yml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">global:</span></span><br><span class="line">  <span class="attr">scrape_interval:</span>     <span class="string">1m</span> <span class="comment">#采样频率</span></span><br><span class="line">  <span class="attr">evaluation_interval:</span> <span class="string">1m</span> <span class="comment">#执行 rules 频率</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 采样配置</span></span><br><span class="line"><span class="attr">scrape_configs:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">job_name:</span> <span class="string">'test-server'</span></span><br><span class="line">    <span class="attr">metrics_path:</span> <span class="string">'/actuator/prometheus'</span></span><br><span class="line">    <span class="attr">static_configs:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">targets:</span> <span class="string">['192.168.1.1:8000','192.168.1.2:8000']</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 报警配置</span></span><br><span class="line"><span class="attr">alerting:</span></span><br><span class="line">  <span class="attr">alertmanagers:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">path_prefix:</span> <span class="string">/alertmanager</span></span><br><span class="line">    <span class="attr">scheme:</span> <span class="string">http</span></span><br><span class="line">    <span class="attr">static_configs:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">targets:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span><span class="string">:9090</span> <span class="comment">#alertmanager 端口</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 报警规则</span></span><br><span class="line"><span class="attr">rule_files:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">'rules/alert-instance-rules.yml'</span></span><br></pre></td></tr></table></figure>
+
+<p>rules/alert-instance-rules.yml</p>
+<figure class="highlight yml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># severity按严重程度由高到低：red、orange、yellow、blue</span></span><br><span class="line"><span class="attr">groups:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">jvm-instance-alerting</span></span><br><span class="line">    <span class="attr">rules:</span></span><br><span class="line"></span><br><span class="line">      <span class="comment"># down了超过30秒</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">alert:</span> <span class="string">instance-down</span></span><br><span class="line">        <span class="attr">expr:</span> <span class="string">up</span> <span class="string">==</span> <span class="number">0</span></span><br><span class="line">        <span class="attr">for:</span> <span class="string">30s</span></span><br><span class="line">        <span class="attr">labels:</span></span><br><span class="line">          <span class="attr">severity:</span> <span class="string">yellow</span></span><br><span class="line">        <span class="attr">annotations:</span></span><br><span class="line">          <span class="attr">summary:</span> <span class="string">"Instance <span class="template-variable">&#123;&#123; $labels.instance &#125;&#125;</span> down"</span></span><br><span class="line">          <span class="attr">description:</span> <span class="string">"<span class="template-variable">&#123;&#123; $labels.instance &#125;&#125;</span> of job <span class="template-variable">&#123;&#123; $labels.job &#125;&#125;</span> has been down for more than 30 seconds."</span></span><br><span class="line"></span><br><span class="line">      <span class="comment"># down了超过1分钟</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">alert:</span> <span class="string">instance-down</span></span><br><span class="line">        <span class="attr">expr:</span> <span class="string">up</span> <span class="string">==</span> <span class="number">0</span></span><br><span class="line">        <span class="attr">for:</span> <span class="string">1m</span></span><br><span class="line">        <span class="attr">labels:</span></span><br><span class="line">          <span class="attr">severity:</span> <span class="string">orange</span></span><br><span class="line">        <span class="attr">annotations:</span></span><br><span class="line">          <span class="attr">summary:</span> <span class="string">"Instance <span class="template-variable">&#123;&#123; $labels.instance &#125;&#125;</span> down"</span></span><br><span class="line">          <span class="attr">description:</span> <span class="string">"<span class="template-variable">&#123;&#123; $labels.instance &#125;&#125;</span> of job <span class="template-variable">&#123;&#123; $labels.job &#125;&#125;</span> has been down for more than 1 minutes."</span></span><br><span class="line"></span><br><span class="line">      <span class="comment"># down了超过5分钟</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">alert:</span> <span class="string">instance-down</span></span><br><span class="line">        <span class="attr">expr:</span> <span class="string">up</span> <span class="string">==</span> <span class="number">0</span></span><br><span class="line">        <span class="attr">for:</span> <span class="string">5m</span></span><br><span class="line">        <span class="attr">labels:</span></span><br><span class="line">          <span class="attr">severity:</span> <span class="string">red</span></span><br><span class="line">        <span class="attr">annotations:</span></span><br><span class="line">          <span class="attr">summary:</span> <span class="string">"Instance <span class="template-variable">&#123;&#123; $labels.instance &#125;&#125;</span> down"</span></span><br><span class="line">          <span class="attr">description:</span> <span class="string">"<span class="template-variable">&#123;&#123; $labels.instance &#125;&#125;</span> of job <span class="template-variable">&#123;&#123; $labels.job &#125;&#125;</span> has been down for more than 5 minutes."</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="启动-Prometheus"><a href="#启动-Prometheus" class="headerlink" title="启动 Prometheus"></a>启动 Prometheus</h3><p>脚本启动</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#!/usr/bin/env bash</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">cd</span> /data/prometheus/prometheus-2.1.0.linux-amd64</span><br><span class="line"></span><br><span class="line">nohup ./alertmanager --config.file=alertmanager-config.yml  --web.listen-address=<span class="string">":6093"</span>  --web.external-url=http://ip:6093/alertmanager --web.route-prefix=alertmanager --log.level=info &gt;/dev/null &amp;</span><br></pre></td></tr></table></figure>
+
+<p>reload</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#!/usr/bin/env bash</span></span><br><span class="line">curl -XPOST http://localhost:6090/prom/-/reload</span><br></pre></td></tr></table></figure>
+
+<p>服务启动</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">systemctl restart prometheus.service</span><br></pre></td></tr></table></figure>
+
+<h3 id="配置-Grafana"><a href="#配置-Grafana" class="headerlink" title="配置 Grafana"></a>配置 Grafana</h3><p>配置Grafana 监控 JVM(Micrometer) Dashboard模板，模板id：4701</p>
+<ol>
+<li>在左侧边栏选择Dashboards –&gt; Manage 菜单；</li>
+<li>在主界面，点击import按钮；</li>
+<li>Granfana.com Dashboard中填写 4701，自动跳转到import详情界面；<br>可以通过以下地址查询更多模板：<a href="https://grafana.com/grafana/dashboards?dataSource=prometheus&amp;collector=nodeExporter" target="_blank" rel="noopener">https://grafana.com/grafana/dashboards?dataSource=prometheus&amp;collector=nodeExporter</a></li>
+<li>Prometheus Data Source选择上面的数据源名称，点击import按钮；</li>
+<li>进入仪表盘查看相应的监控指标；</li>
+</ol>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">Monitor</a>
+        		</li>
+      		 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color1">Prometheus</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+	<div class="article-category tagcloud">
+		<i class="icon-book icon"></i>
+		<ul class="article-tag-list">
+			
+        		<li class="article-tag-list-item">
+        			<a href="/categories/DevOps/" class="article-tag-list-link color2">DevOps</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="/2020/06/10/20200610-devops-promethues-04/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-20200610-devops-promethues-03" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2020/06/10/20200610-devops-promethues-03/">Prometheus--（三）Actuator 介绍</a>
+    </h1>
+  
+
+        
+        <a href="/2020/06/10/20200610-devops-promethues-03/" class="archive-article-date">
+  	<time datetime="2020-06-10T12:19:58.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-06-10</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="Actuator介绍"><a href="#Actuator介绍" class="headerlink" title="Actuator介绍"></a>Actuator介绍</h2><h3 id="概览"><a href="#概览" class="headerlink" title="概览"></a>概览</h3><p>springboot 实时监控插件 spring-boot-starter-actuator ，提供了很多监控所需的接口，可以对应用系统进行配置查看、相关功能统计等。</p>
+<p>其中，actuator 的 endpoints 允许监视应用程序并与之交互.</p>
+<p>Spring Boot 包含很多内建的 endpoints ，并且允许自定义节点。<br>每个独立的 endpoint 都可被设置成  enabled or disabled 和 exposed (允许远程访问) over HTTP or JMX</p>
+<h3 id="依赖"><a href="#依赖" class="headerlink" title="依赖"></a>依赖</h3><p>springboot框架，自带actuator监控，在pom中引入jar包即可使用。</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>org.springframework.boot<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>spring-boot-starter-actuator<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">version</span>&gt;</span>2.0.2.RELEASE<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="使用"><a href="#使用" class="headerlink" title="使用"></a>使用</h3><p><strong>1、启动项目后即可访问（默认和服务同端口）</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">http:&#x2F;&#x2F;localhost:8000&#x2F;webproject&#x2F;actuator&#x2F;health</span><br><span class="line">http:&#x2F;&#x2F;localhost:8000&#x2F;webproject&#x2F;actuator&#x2F;info</span><br></pre></td></tr></table></figure>
+
+<p>a. 可修改路由:<br>在application.propertie 配置文件中添加</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">management.endpoints.web.base-path&#x3D;&#x2F;monitor</span><br></pre></td></tr></table></figure>
+
+<p>就可以访问</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http:&#x2F;&#x2F;localhost:8000&#x2F;webproject&#x2F;monitor&#x2F;health</span><br></pre></td></tr></table></figure>
+
+<p>b. 可添加endpoint开关：</p>
+<figure class="highlight properties"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">management.endpoints.web.exposure.include</span>=<span class="string">health,info,metrics,prometheus,restart,pause</span></span><br><span class="line"><span class="meta">management.endpoint.pause.enabled</span>=<span class="string">true</span></span><br><span class="line"><span class="meta">management.endpoint.restart.enabled</span>=<span class="string">true</span></span><br></pre></td></tr></table></figure>
+
+<p>就可以通过如下api管理：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">curl -XPOST http://localhost:8000/actuator/pause</span><br><span class="line">curl -XPOST http://localhost:8000/actuator/restart</span><br></pre></td></tr></table></figure>
+
+<p><strong>2、actuator 提供了很多api</strong></p>
+<p>默认只开放了 health、info两个节点，如果需要公开所有 则在配置文件中继续加入</p>
+<figure class="highlight properties"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">management.endpoints.web.exposure.include</span>=<span class="string">*</span></span><br></pre></td></tr></table></figure>
+
+<p>其中 health方法 是不显示具体的内容的，如需要<br>则继续加入配置</p>
+<figure class="highlight properties"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">management.endpoint.health.show-details</span>=<span class="string">always</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>3、api列表</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">HTTP方法 路径 描述 鉴权</span><br><span class="line">GET &#x2F;autoconfig 查看自动配置的使用情况 true</span><br><span class="line">GET &#x2F;configprops 查看配置属性，包括默认配置 true</span><br><span class="line">GET &#x2F;beans 查看bean及其关系列表 true</span><br><span class="line">GET &#x2F;dump 打印线程栈 true</span><br><span class="line">GET &#x2F;env 查看所有环境变量 true</span><br><span class="line">GET &#x2F;env&#x2F;&#123;name&#125; 查看具体变量值 true</span><br><span class="line">GET &#x2F;health 查看应用健康指标 false</span><br><span class="line">GET &#x2F;info 查看应用信息</span><br><span class="line">GET &#x2F;mappings 查看所有url映射 true</span><br><span class="line">GET &#x2F;metrics 查看应用基本指标 true</span><br><span class="line">GET &#x2F;metrics&#x2F;&#123;name&#125; 查看具体指标 true</span><br><span class="line">POST &#x2F;shutdown 关闭应用（要真正生效，得配置文件开启endpoints.shutdown.enabled: true） true</span><br><span class="line">GET &#x2F;trace 查看基本追踪信息 true</span><br></pre></td></tr></table></figure>
+
+<p>详细可参考：<a href="https://docs.spring.io/spring-boot/docs/current-SNAPSHOT/reference/htmlsingle/#production-ready" target="_blank" rel="noopener">production-ready</a></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">Monitor</a>
+        		</li>
+      		 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color1">Prometheus</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+	<div class="article-category tagcloud">
+		<i class="icon-book icon"></i>
+		<ul class="article-tag-list">
+			
+        		<li class="article-tag-list-item">
+        			<a href="/categories/DevOps/" class="article-tag-list-link color2">DevOps</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="/2020/06/10/20200610-devops-promethues-03/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-20200609-devops-promethues-02" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -174,12 +411,12 @@
         <h2 id="概览"><a href="#概览" class="headerlink" title="概览"></a>概览</h2><p>Prometheus是一个监控平台，它通过在这些目标上刮取度量HTTP端点来收集来自被监控目标的度量。<br>下面介绍普罗米修斯的安装、配置和监控配置。</p>
 <h3 id="下载"><a href="#下载" class="headerlink" title="下载"></a>下载</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">wget https://github.com/prometheus/prometheus/releases/download/v2.19.0-rc.0/prometheus-2.19.0-rc.0.linux-amd64.tar.gz</span><br><span class="line"></span><br><span class="line">tar zxvf prometheus-2.19.0-rc.0.linux-amd64.tar.gz</span><br><span class="line"><span class="built_in">cd</span> prometheus-2.19.0-rc.0.linux-amd64</span><br><span class="line"></span><br><span class="line">./prometheus --<span class="built_in">help</span></span><br></pre></td></tr></table></figure>
 
-<h3 id="配置"><a href="#配置" class="headerlink" title="配置"></a>配置</h3><figure class="highlight yml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 全局配置</span></span><br><span class="line"><span class="attr">global:</span></span><br><span class="line">  <span class="attr">scrape_interval:</span>     <span class="string">15s</span>  <span class="comment">#采样频率</span></span><br><span class="line">  <span class="attr">evaluation_interval:</span> <span class="string">15s</span>  <span class="comment">#规则触发频率</span></span><br><span class="line"></span><br><span class="line"><span class="attr">rule_files:</span></span><br><span class="line">  <span class="comment"># - "first.rules"</span></span><br><span class="line">  <span class="comment"># - "second.rules"</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 采样配置, 由于普罗米修斯将自己的数据公开为一个HTTP端点，因此它可以对自己的健康状况进行清理和监视</span></span><br><span class="line"><span class="attr">scrape_configs:</span></span><br><span class="line">  <span class="comment"># 作业名</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">job_name:</span> <span class="string">prometheus</span></span><br><span class="line">    <span class="attr">static_configs:</span></span><br><span class="line">      <span class="comment"># 采样目标地址</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">targets:</span> <span class="string">['localhost:9090']</span></span><br></pre></td></tr></table></figure>
+<h3 id="配置"><a href="#配置" class="headerlink" title="配置"></a>配置</h3><figure class="highlight yml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 全局配置</span></span><br><span class="line"><span class="attr">global:</span></span><br><span class="line">  <span class="attr">scrape_interval:</span>     <span class="string">15s</span>  <span class="comment">#采样频率</span></span><br><span class="line">  <span class="attr">evaluation_interval:</span> <span class="string">15s</span>  <span class="comment">#规则触发频率</span></span><br><span class="line"></span><br><span class="line"><span class="attr">rule_files:</span></span><br><span class="line">  <span class="comment"># - "first.rules"</span></span><br><span class="line">  <span class="comment"># - "second.rules"</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 采样配置, 由于普罗米修斯将自己的数据公开为一个HTTP端点，因此它可以对自己的健康状况进行清理和监视</span></span><br><span class="line"><span class="attr">scrape_configs:</span></span><br><span class="line">  <span class="comment"># 作业名</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">job_name:</span> <span class="string">prometheus</span></span><br><span class="line">    <span class="attr">static_configs:</span></span><br><span class="line">      <span class="comment"># 采样目标地址</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">targets:</span> <span class="string">['ip:port']</span></span><br></pre></td></tr></table></figure>
 
-<h3 id="启动"><a href="#启动" class="headerlink" title="启动"></a>启动</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">./prometheus --config.file=prometheus.yml</span><br><span class="line"></span><br><span class="line"><span class="comment"># 或者指定端口（default 9090）</span></span><br><span class="line">./prometheus --config.file=prometheus.yml --web.enable-lifecycle   --web.external-url=<span class="string">"http://ip:port/prom"</span>  \</span><br><span class="line"> --web.route-prefix=prom   --web.listen-address=<span class="string">"0.0.0.0:port"</span> --log.level=<span class="string">"info"</span></span><br></pre></td></tr></table></figure>
+<h3 id="启动"><a href="#启动" class="headerlink" title="启动"></a>启动</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">./prometheus --config.file=prometheus.yml</span><br><span class="line"></span><br><span class="line"><span class="comment"># 或者指定端口（default 9090）</span></span><br><span class="line">./prometheus --config.file=prometheus.yml --web.enable-lifecycle   --web.external-url=<span class="string">"http://outer-ip:port/prom"</span>  \</span><br><span class="line"> --web.route-prefix=prom   --web.listen-address=<span class="string">"0.0.0.0:port"</span> --log.level=<span class="string">"info"</span></span><br></pre></td></tr></table></figure>
 
 <p>重启</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -XPOST http://127.0.0.1:port/prom/-/reload</span><br></pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -XPOST http://localhost:port/prom/-/reload</span><br></pre></td></tr></table></figure>
 
 <h3 id="监控面板"><a href="#监控面板" class="headerlink" title="监控面板"></a>监控面板</h3><p>面板地址：</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http:&#x2F;&#x2F;localhost:9090</span><br></pre></td></tr></table></figure>
@@ -188,7 +425,7 @@
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http:&#x2F;&#x2F;localhost:9090&#x2F;metrics</span><br></pre></td></tr></table></figure>
 
 <h3 id="使用内建表达式浏览器"><a href="#使用内建表达式浏览器" class="headerlink" title="使用内建表达式浏览器"></a>使用内建表达式浏览器</h3><p>访问如下地址，并选择 Console</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http:&#x2F;&#x2F;localhost:9090&#x2F;graph</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http:&#x2F;&#x2F;outer-ip:9090&#x2F;graph</span><br></pre></td></tr></table></figure>
 
 <p>选择关于Prometheus自身的一个度量选项：</p>
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">promhttp_metric_handler_requests_total</span><br></pre></td></tr></table></figure>
