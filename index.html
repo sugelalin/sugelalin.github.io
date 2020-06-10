@@ -151,6 +151,145 @@
           <div id="js-content" class="content-ll">
             
   
+    <article id="post-20200610-devops-promethues-05" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2020/06/10/20200610-devops-promethues-05/">Prometheus--（五）Prometheus 告警</a>
+    </h1>
+  
+
+        
+        <a href="/2020/06/10/20200610-devops-promethues-05/" class="archive-article-date">
+  	<time datetime="2020-06-10T12:44:22.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-06-10</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="Prometheus-告警"><a href="#Prometheus-告警" class="headerlink" title="Prometheus 告警"></a>Prometheus 告警</h2><h3 id="概览"><a href="#概览" class="headerlink" title="概览"></a>概览</h3><p>用普罗米修斯发出警报分为两部分。</p>
+<ol>
+<li>普罗米修斯服务器中的警报规则向警报管理器发送警报。</li>
+<li>Alertmanager管理这些警报，包括静音、抑制、聚合和通过电子邮件、通话通知系统和聊天平台等方法发送通知。</li>
+</ol>
+<p>设置警报和通知的主要步骤是：</p>
+<ul>
+<li>设置和配置Alertmanager</li>
+<li>配置普罗米修斯与警报管理器对话</li>
+<li>在普罗米修斯中创建警报规则</li>
+</ul>
+<h3 id="告警管理器-Alertmanager"><a href="#告警管理器-Alertmanager" class="headerlink" title="告警管理器 Alertmanager"></a>告警管理器 Alertmanager</h3><p>Alertmanager负责处理来自客户端应用程序（如Prometheus服务器）的警报。它负责重复数据消除、分组，并将它们路由到正确的接收器集成（如邮件、WebHook等）。它还负责消除和抑制警报。</p>
+<h4 id="分组-Grouping"><a href="#分组-Grouping" class="headerlink" title="分组 Grouping"></a>分组 Grouping</h4><p>分组将类似性质的警报分类为单个通知。当许多系统同时发生故障，并且可能同时触发成百上千个警报时，这在较大的停机期间尤其有用。</p>
+<p>作为用户，用户只想获得一个页面，同时仍然能够确切地看到哪些服务实例受到了影响。因此，我们可以将Alertmanager配置为按其群集和alertname对警报进行分组，以便发送单个压缩通知。</p>
+<p>警报分组、分组通知的计时以及这些通知的接收者由配置文件中的路由树配置。</p>
+<h4 id="抑制-Inhibition"><a href="#抑制-Inhibition" class="headerlink" title="抑制 Inhibition"></a>抑制 Inhibition</h4><p>抑制是是指当某些其他警报已经触发时，抑制某些警报的通知。</p>
+<p>通过 Alertmanager 的配置文件配置。</p>
+<h4 id="静默-Silences"><a href="#静默-Silences" class="headerlink" title="静默 Silences"></a>静默 Silences</h4><p>可以在给定时间内将警报静音。静默是基于匹配器配置的，就像路由树一样。将检查传入警报是否与活动静默的所有相等或正则表达式匹配项匹配。如果匹配到，就不会发送该警报的通知。</p>
+<p>通过 Alertmanager 的web界面中配置静默。</p>
+<h4 id="客户端行为-Client-behavior"><a href="#客户端行为-Client-behavior" class="headerlink" title="客户端行为 Client behavior"></a>客户端行为 Client behavior</h4><p>Alertmanager对其客户端的行为有特殊要求。只与Prometheus不用于发送警报的高级用例相关。</p>
+<h4 id="高可用-High-Availability"><a href="#高可用-High-Availability" class="headerlink" title="高可用 High Availability"></a>高可用 High Availability</h4><p>Alertmanager支持配置以创建高可用性群集。这可以使用–cluster-*标志进行配置。</p>
+<p>重要的不是在Prometheus和它的Alertmanagers之间进行负载平衡，而是将Prometheus指向一个所有Alertmanagers的列表。</p>
+<h3 id="安装-alertmanager"><a href="#安装-alertmanager" class="headerlink" title="安装 alertmanager"></a>安装 alertmanager</h3><p>下载</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">wget https://github.com/prometheus/prometheus/releases/download/v2.19.0-rc.0/prometheus-2.19.0-rc.0.linux-amd64.tar.gz</span><br><span class="line"></span><br><span class="line">tar zxvf prometheus-2.19.0-rc.0.linux-amd64.tar.gz</span><br><span class="line"><span class="built_in">cd</span> prometheus-2.19.0-rc.0.linux-amd64</span><br><span class="line"></span><br><span class="line">./prometheus --<span class="built_in">help</span></span><br></pre></td></tr></table></figure>
+
+<p>配置 alertmanager.yml</p>
+<figure class="highlight yml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">global:</span></span><br><span class="line"><span class="attr">route:</span></span><br><span class="line">  <span class="attr">group_by:</span> <span class="string">['alertname',</span> <span class="string">'instance'</span><span class="string">]</span></span><br><span class="line">  <span class="attr">group_wait:</span> <span class="string">30s</span></span><br><span class="line">  <span class="attr">group_interval:</span> <span class="string">1m</span></span><br><span class="line">  <span class="attr">repeat_interval:</span> <span class="string">1m</span></span><br><span class="line">  <span class="attr">receiver:</span> <span class="string">'dingding'</span></span><br><span class="line"><span class="attr">receivers:</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">name:</span> <span class="string">'dingding'</span></span><br><span class="line">  <span class="attr">webhook_configs:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">url:</span> <span class="string">http://localhost:8060/dingtalk/webhook/send</span></span><br><span class="line">    <span class="attr">send_resolved:</span> <span class="literal">true</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="安装-Webhook-dingtalk"><a href="#安装-Webhook-dingtalk" class="headerlink" title="安装 Webhook-dingtalk"></a>安装 Webhook-dingtalk</h3><p>下载：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">wget https://github.com/timonwong/prometheus-webhook-dingtalk/releases/download/v1.4.0/prometheus-webhook-dingtalk-1.4.0.linux-amd64.tar.gz</span><br><span class="line"></span><br><span class="line">tar prometheus-webhook-dingtalk-1.4.0.linux-amd64.tar.gz</span><br><span class="line"><span class="built_in">cd</span> prometheus-webhook-dingtalk-1.4.0.linux-amd64</span><br></pre></td></tr></table></figure>
+
+<p>启动：run.sh</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#!/usr/bin/env bash</span></span><br><span class="line"></span><br><span class="line">nohup ./prometheus-webhook-dingtalk --ding.profile=<span class="string">"webhook=https://oapi.dingtalk.com/robot/send?access_token=xxxxxxxx"</span> &gt;/dev/null &amp;</span><br></pre></td></tr></table></figure>
+
+<p>测试钉钉：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -H <span class="string">"Content-Type:application/json"</span>  -d <span class="string">'&#123;"msgtype": "text","text": &#123;"content": "我就是我, 是不一样的烟火"&#125;&#125;'</span> https://oapi.dingtalk.com/robot/send?access_token=xxxxxxxx</span><br></pre></td></tr></table></figure>
+
+<p>测试webhook-dingding：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -H <span class="string">"Content-Type:application/json"</span>  -d <span class="string">'&#123; "version": "4", "status": "firing", "description":"description_content"&#125;'</span> http://localhost:8060/dingtalk/webhook/send</span><br></pre></td></tr></table></figure>
+
+<p>配置多个webhook可参考<a href="https://theo.im/blog/2017/10/16/release-prometheus-alertmanager-webhook-for-dingtalk/" target="_blank" rel="noopener">链接</a></p>
+<h3 id="配置Prometheus"><a href="#配置Prometheus" class="headerlink" title="配置Prometheus"></a>配置Prometheus</h3><p>配置 prometheus.yml 中的 alerting和 rule_files（上一节已配置好）。一旦触发规则，即触发钉钉机器人报警。</p>
+<h3 id="Other"><a href="#Other" class="headerlink" title="Other"></a>Other</h3><p>Prometheus WebUI：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http:&#x2F;&#x2F;outer-ip:6090&#x2F;prom&#x2F;targets</span><br></pre></td></tr></table></figure>
+
+<p>线上Alertingmanager WebUI：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http:&#x2F;&#x2F;outer-ip:6093&#x2F;alertmanager&#x2F;#&#x2F;alerts</span><br></pre></td></tr></table></figure>
+
+<p>关系<br>prometheus — 发送消息给 -—&gt; alertmanager — 调用第三方 -—&gt; dingding-webhook</p>
+<p><strong>参考链接</strong>：</p>
+<p><a href="https://www.cnblogs.com/g2thend/p/11865302.html" target="_blank" rel="noopener">https://www.cnblogs.com/g2thend/p/11865302.html</a><br><a href="https://www.jianshu.com/p/9fdd4f3497c6" target="_blank" rel="noopener">https://www.jianshu.com/p/9fdd4f3497c6</a><br><a href="https://theo.im/blog/2017/10/16/release-prometheus-alertmanager-webhook-for-dingtalk/" target="_blank" rel="noopener">https://theo.im/blog/2017/10/16/release-prometheus-alertmanager-webhook-for-dingtalk/</a></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">Monitor</a>
+        		</li>
+      		 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color1">Prometheus</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+	<div class="article-category tagcloud">
+		<i class="icon-book icon"></i>
+		<ul class="article-tag-list">
+			
+        		<li class="article-tag-list-item">
+        			<a href="/categories/DevOps/" class="article-tag-list-link color2">DevOps</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="/2020/06/10/20200610-devops-promethues-05/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-20200610-devops-promethues-04" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -977,15 +1116,15 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
           <ul class="article-tag-list" q-show="showTags">
             
               <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color5">hexo</a>
+              </li>
+            
+              <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color3">Monitor</a>
               </li>
             
               <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color1">Prometheus</a>
-              </li>
-            
-              <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color5">hexo</a>
               </li>
             
             <div class="clearfix"></div>
