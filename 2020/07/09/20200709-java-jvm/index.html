@@ -8,12 +8,12 @@
   <link rel="dns-prefetch" href="http://yoursite.com">
   <title>记一次线上 OOM Debug过程 | Allen</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="记一次线上 OOM Debug过程背景通过Prometheus的监控报警，得知线上服务有一台机器，一直报JVM usage &gt; 95%，并且一直高居不下。经过查看stderr.log发现，有oom报错。 过程1. 登录有问题的机器使用命令  1jstat -gc pid 1000  查看jvm年轻代和老年代的容量和使用情况如下： 123a.发现老年代的内存使用率几乎达到95%，年轻代的内存使">
+  <meta name="description" content="背景通过Prometheus的监控报警，得知线上服务有一台机器，一直报JVM usage &gt; 95%，并且一直高居不下。经过查看stderr.log发现，有oom报错。 过程1. 登录有问题的机器使用命令  1jstat -gc pid 1000  查看jvm年轻代和老年代的容量和使用情况如下： 123a.发现老年代的内存使用率几乎达到95%，年轻代的内存使用比率也很高，达到90%以上。b.">
 <meta property="og:type" content="article">
 <meta property="og:title" content="记一次线上 OOM Debug过程">
 <meta property="og:url" content="http://yoursite.com/2020/07/09/20200709-java-jvm/index.html">
 <meta property="og:site_name" content="Allen">
-<meta property="og:description" content="记一次线上 OOM Debug过程背景通过Prometheus的监控报警，得知线上服务有一台机器，一直报JVM usage &gt; 95%，并且一直高居不下。经过查看stderr.log发现，有oom报错。 过程1. 登录有问题的机器使用命令  1jstat -gc pid 1000  查看jvm年轻代和老年代的容量和使用情况如下： 123a.发现老年代的内存使用率几乎达到95%，年轻代的内存使">
+<meta property="og:description" content="背景通过Prometheus的监控报警，得知线上服务有一台机器，一直报JVM usage &gt; 95%，并且一直高居不下。经过查看stderr.log发现，有oom报错。 过程1. 登录有问题的机器使用命令  1jstat -gc pid 1000  查看jvm年轻代和老年代的容量和使用情况如下： 123a.发现老年代的内存使用率几乎达到95%，年轻代的内存使用比率也很高，达到90%以上。b.">
 <meta property="og:image" content="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-vvm-01.jpg">
 <meta property="og:image" content="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-vvm-02.jpg">
 <meta property="og:image" content="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-vvm-03.jpg">
@@ -26,7 +26,7 @@
 <meta property="og:image" content="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-04.jpg">
 <meta property="og:image" content="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-05.jpg">
 <meta property="article:published_time" content="2020-07-09T08:51:31.000Z">
-<meta property="article:modified_time" content="2020-07-10T17:19:18.360Z">
+<meta property="article:modified_time" content="2020-07-10T17:24:19.559Z">
 <meta property="article:author" content="yulin">
 <meta property="article:tag" content="JVM">
 <meta name="twitter:card" content="summary">
@@ -190,7 +190,7 @@
     
     <div class="article-entry" itemprop="articleBody">
       
-        <h2 id="记一次线上-OOM-Debug过程"><a href="#记一次线上-OOM-Debug过程" class="headerlink" title="记一次线上 OOM Debug过程"></a>记一次线上 OOM Debug过程</h2><h3 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h3><p>通过Prometheus的监控报警，得知线上服务有一台机器，一直报JVM usage &gt; 95%，并且一直高居不下。经过查看stderr.log发现，有oom报错。</p>
+        <h3 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h3><p>通过Prometheus的监控报警，得知线上服务有一台机器，一直报JVM usage &gt; 95%，并且一直高居不下。经过查看stderr.log发现，有oom报错。</p>
 <h3 id="过程"><a href="#过程" class="headerlink" title="过程"></a>过程</h3><p><strong>1. 登录有问题的机器</strong><br>使用命令 </p>
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jstat -gc pid 1000</span><br></pre></td></tr></table></figure>
 
@@ -266,7 +266,7 @@
 <p>MAT-图-2<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-02.jpg" alt="MAT-图-2"></p>
 <p><strong>4. 最后追踪问题根源</strong></p>
 <p>MAT-图-3<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-03.jpg" alt="MAT-图-3"></p>
-<p><strong>5. 修复zipkin BUG，重启服务，一段时间后内存状况</strong></p>
+<p><strong>5. 修复zipkin BUG，重启服务，一段时间后通过Grafana查看内存状况</strong></p>
 <p>MAT-图-4<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-04.jpg" alt="MAT-图-4"></p>
 <p>MAT-图-5<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-05.jpg" alt="MAT-图-5"></p>
 <h3 id="分析工具对比"><a href="#分析工具对比" class="headerlink" title="分析工具对比"></a>分析工具对比</h3><ol>
@@ -568,15 +568,15 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
           <ul class="article-tag-list" q-show="showTags">
             
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color5">hexo</a>
-              </li>
-            
-              <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color3">Monitor</a>
               </li>
             
               <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color1">Prometheus</a>
+              </li>
+            
+              <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color5">hexo</a>
               </li>
             
               <li class="article-tag-list-item">
