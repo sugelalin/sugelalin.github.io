@@ -155,6 +155,224 @@
           <div id="js-content" class="content-ll">
             
   
+    <article id="post-20200709-java-jvm" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2020/07/09/20200709-java-jvm/">记一次线上 OOM Debug过程</a>
+    </h1>
+  
+
+        
+        <a href="/2020/07/09/20200709-java-jvm/" class="archive-article-date">
+  	<time datetime="2020-07-09T08:51:31.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-07-09</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="记一次线上-OOM-Debug过程"><a href="#记一次线上-OOM-Debug过程" class="headerlink" title="记一次线上 OOM Debug过程"></a>记一次线上 OOM Debug过程</h2><h3 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h3><p>通过Prometheus的监控报警，得知线上服务有一台机器，一直报JVM usage &gt; 95%，并且一直高居不下。经过查看stderr.log发现，有oom报错。</p>
+<h3 id="过程"><a href="#过程" class="headerlink" title="过程"></a>过程</h3><p><strong>1. 登录有问题的机器</strong><br>使用命令 </p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jstat -gc pid 1000</span><br></pre></td></tr></table></figure>
+
+<p>查看jvm年轻代和老年代的容量和使用情况如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">a.发现老年代的内存使用率几乎达到95%，年轻代的内存使用比率也很高，达到90%以上。</span><br><span class="line"></span><br><span class="line">b.另外发现Minor GC频繁GC，并且每次只能回收调一小部分的内存；而FULL GC次数为0，但此时JVM几乎已经爆满了</span><br></pre></td></tr></table></figure>
+
+<p><strong>2. 基于以上两种情况</strong> </p>
+<p>我们下一步本应该将内存dump出来，去分析内存的使用情况。但由于当时为了查看堆内存中存活对象的使用情况（对jmap命令不够了解），直接执行了 <code>jmap -histo:live pid</code> 命令。然后我虽然查看到当前存活进程有大量的Object对象占用了30%多的内存，而这里面一定有鬼，但没有获得到更多的有价值的信息。</p>
+<p><strong>3. 就在此时我惊奇的发现 JVM usage 降下来了，达到了 60%左右</strong></p>
+<p>再次通过 jstat 命令查看，发现原来发生了一次FULL GC。当时有点不可思议，为什么线上服务这么久都没有FULL GC，而这一会就突然产生FULL GC了。然后怀疑是不是我的操作的问题。经过Google，得知 以下两命令会主动触发一次FULL GC。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">jmap -histo:live pid </span><br><span class="line"><span class="meta">#</span><span class="bash">或者</span></span><br><span class="line">jmap -dump:live,file=dump_001.bin pid</span><br></pre></td></tr></table></figure>
+<p>具体原理详见 <a href="https://www.google.hk.com" target="_blank" rel="noopener">JVM 命令行工具 jmap gc分析</a></p>
+<p><strong>4. 非常幸运的是</strong></p>
+<p>另外一个同事大佬在我触发GC之前已经将内存堆dump出来了，这样就避免了我再次等待很长一段时间才能复现问题。而且他已使用MAT，将dump出来的heap.hprof分析得知，是由于zipkin2.reporter.InMemoryReporterMetrics 达到了1.6G导致的，并Google到一篇类似的文章-<a href="https://blog.csdn.net/u010648555/article/details/107051706" target="_blank" rel="noopener">zipkin2.reporter.InMemoryReporterMetrics导致服务器CPU100%及应用OOM问题排查和解决</a>，到此问题就基本定位了。</p>
+<p><strong>5. 但是事情并没有结束</strong></p>
+<p>本菜本着 纸上得来终觉浅，绝知此事要躬行的原则，对此进行了进一步探索，没想到还有意外的发现。</p>
+<h2 id="探索"><a href="#探索" class="headerlink" title="探索"></a>探索</h2><p>上面说了，同事大佬已经将堆快照dump出来了，于是我灵机一动，将heapdump.hprof压缩下载到本地，一顿操作。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">tar czvf heapdump.tar.gz ./heapdump.hprof</span><br><span class="line"></span><br><span class="line">nc -l 8181 &lt; heapdump.tar.gz</span><br><span class="line">nc remote-ip 8181 &gt; heapdump.tar.gz</span><br><span class="line"></span><br><span class="line">tar zxvf heapdump.tar.gz</span><br></pre></td></tr></table></figure>
+
+<p>接下来开始探索之旅</p>
+<h3 id="使用-jconsole-分析"><a href="#使用-jconsole-分析" class="headerlink" title="使用 jconsole 分析"></a>使用 jconsole 分析</h3><p>jconsole 是一种基于JMX的可视化监视、管理工具，已继承到OpenJDK中。相当于可视化的jstat。</p>
+<h4 id="分析步骤"><a href="#分析步骤" class="headerlink" title="分析步骤"></a>分析步骤</h4><p><strong>1. 启动 heap快照</strong></p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jhat -J-Xmx2G -port 8999 heapdump.phrof</span><br></pre></td></tr></table></figure>
+<p><strong>2. 启动jconsole</strong></p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jconsole</span><br></pre></td></tr></table></figure>
+<p><strong>3. jconsole 连接快照进程</strong><br>可以查看JVM各个区的空间情况，类加载情况，线程数等，但没有得到对象的分布情况。而且建立连接时，由于快照比较大，加载的很慢。</p>
+<p>其实jconsole更适合做jvm监控工具，以及排死锁。也可作为项目上线前的内存调优工具使用。</p>
+<p>既然没有得到想要的东西，只能换把菜刀….</p>
+<h3 id="使用-VisualVM-分析"><a href="#使用-VisualVM-分析" class="headerlink" title="使用 VisualVM 分析"></a>使用 VisualVM 分析</h3><p>VisualVM 是Netbeans的profile子项目，已经继承到OpenJDK中，它提供了一个可视界面，用于查看JVM上运行的程序的详细信息。可以连接本地或远程JVM。</p>
+<h4 id="分析步骤-1"><a href="#分析步骤-1" class="headerlink" title="分析步骤"></a>分析步骤</h4><p><strong>1. 启动 jvisualvm</strong></p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">堆大约2G容量，这里启动时分配2G便于操作</span></span><br><span class="line">jvisualvm -J-Xmx2G</span><br></pre></td></tr></table></figure>
+<p><strong>2. 将heapdump.hprof装入虚拟机中</strong></p>
+<p>VisualVM-图-1<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-vvm-01.jpg" alt="VisualVM-图-1"></p>
+<p>按大小查看类的分配可已看出有这么几个问题：</p>
+<ul>
+<li>有大量的对象数组Object[]，内存占比高达30%，怀疑是某个对被不断的创建</li>
+<li>另外还有char[]、short[]、int[] 数组大量占用实例数和内存空间</li>
+<li>ResourceAccessException，明显可见的异常，100多万个实例，内存占比高达2.7%，约 50M。</li>
+<li>ConnectException，明显可见的异常，和 ResourceAccessException同样的数量和内存占比。</li>
+</ul>
+<p><strong>3. 然后我们先点击第二个 ResourceAccessException，右键–&gt;在实例视图中显示</strong></p>
+<p>VisualVM-图-2<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-vvm-02.jpg" alt="VisualVM-图-2"></p>
+<p><strong>4. 在 实例 一栏，随便点开一个实例，然后查看它的detailMessage 信息得到如图所示</strong></p>
+<p>VisualVM-图-3<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-vvm-03.jpg" alt="VisualVM-图-3"></p>
+<p>detailMessage.value的信息为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">I&#x2F;O error on POST request for &quot;http:&#x2F;&#x2F;localhost:xxx&#x2F;api&#x2F;v2&#x2F;spans&quot; : Connection refuesed （Connection refuesed）</span><br></pre></td></tr></table></figure>
+
+<p>到此基本可以断定，是由于某项配置地址的问题，它竟然连接到本地了！</p>
+<p><strong>5. 重新在 类 视图中，选择 ConnectException，右键–&gt;在实例视图中显示</strong></p>
+<p>VisualVM-图-4<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-vvm-04.jpg" alt="VisualVM-图-4"></p>
+<p>detailMessage.value的信息为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Connection refuesed （Connection refuesed）</span><br></pre></td></tr></table></figure>
+
+<p><strong>6. 然后再次在 类 视图中，选择 java.lang.Object[]，右键–&gt;在实例视图中显示</strong></p>
+<p>这时候由于实例中不一定都有哪些内容，因此我们要从实例视图中，根据实例大小，寻找大量重复出现的内容。</p>
+<p>在前几个折叠列表里面，没有找到，于是继续耐心寻找，终于在第5个折叠中找到大量的大小为 280和 64的实例</p>
+<p>VisualVM-图-5<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-vvm-051.jpg" alt="VisualVM-图-5"></p>
+<p>先看大小为64 的实例：</p>
+<p>另外，看图中 字段 一栏，有int[]、short[]、Object[]，这也 VisualVM-图-1相对应</p>
+<p>再看大小为280 的实例：</p>
+<p>VisualVM-图-6<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-vvm-06.jpg" alt="VisualVM-图-6"></p>
+<p><strong>7. 这样 6中的两个实例视图正好和 4、5 的异常对应上</strong></p>
+<p>同时根据异常的信息，可以知道是zipkin地址的问题。然后经过检查项目中的代码，发现这个服务的zipkin服务地址没有配置，于是就默认是localhost:9411，这就难怪会报错了。将地址改为正确的地址后重启服务，恢复正常。</p>
+<p>虽然看着分析的头头是道，但实际情况却是一开始我对 VisualVM 并不熟悉，上面VisualVM的这些分析，我都是事后根据MAT分析结果，重新分析推测出来的（好一个事后诸葛亮！）。</p>
+<p>但这并不妨碍我们借助MAT的分析结果，学习如何使用VisualVM，毕竟多一个朋友多一条路，多会一个工具多一种装逼的技能。</p>
+<h3 id="使用-MAT-Memory-Analyzer-Tool-分析-推荐"><a href="#使用-MAT-Memory-Analyzer-Tool-分析-推荐" class="headerlink" title="使用 MAT (Memory Analyzer Tool)分析 (推荐)"></a>使用 MAT (Memory Analyzer Tool)分析 (推荐)</h3><p>分析步骤：</p>
+<p><strong>1. 启动MAT</strong></p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">默认1024m</span></span><br><span class="line">./mat.app/Contents/MacOS/MemoryAnalyzer -vmargs– Xmx4G</span><br></pre></td></tr></table></figure>
+
+<p><strong>2. 将heapdump.hprof装入虚拟机中</strong></p>
+<p>MAT-图-1<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-01.jpg" alt="MAT-图-1"></p>
+<p><strong>3. 点击report –&gt; leak suspects –&gt; Description –&gt; Detail</strong></p>
+<p>MAT-图-2<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-02.jpg" alt="MAT-图-2"></p>
+<p><strong>4. 最后追踪问题根源</strong></p>
+<p>MAT-图-3<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-03.jpg" alt="MAT-图-3"></p>
+<p><strong>5. 修复zipkin BUG，重启服务，一段时间后内存状况</strong></p>
+<p>MAT-图-4<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-04.jpg" alt="MAT-图-4"></p>
+<p>MAT-图-5<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-05.jpg" alt="MAT-图-5"></p>
+<h3 id="分析工具对比"><a href="#分析工具对比" class="headerlink" title="分析工具对比"></a>分析工具对比</h3><ol>
+<li>jconsole 适合开发时优化、监控本地jvm时使用，可以用来排查死锁</li>
+<li>jvisualvm 适合分析堆快照，相当于jstat/jmap/jstack/jhat/jinfo 五件套的可视化工具，另外可以在ide中安装 jvisualvm插件，在开发时用来优化jvm</li>
+<li>MAT 功能强大，十分推荐，很多功能还有待探索</li>
+</ol>
+<h3 id="最后"><a href="#最后" class="headerlink" title="最后"></a>最后</h3><p>总结一下Java 排查线上问题的一般步骤</p>
+<p><strong>1. 问题现象</strong></p>
+<ul>
+<li>一般情况是收到报警信息，服务出现错误和异常</li>
+<li>严重点是服务功能直接不可用</li>
+</ul>
+<p><strong>2. 环境说明</strong></p>
+<ul>
+<li>服务器OS、OS版本</li>
+<li>服务部署情况</li>
+<li>服务功能</li>
+<li>相关依赖</li>
+</ul>
+<p><strong>3. 问题排查</strong></p>
+<ul>
+<li>检查服务状态和健康检查</li>
+<li>查看服务器日志：业务access/error日志、服务stdout/stderr日志、gc日志、系统日志/var/log/message</li>
+<li>查询服务器资源占用情况：top/htop、dmesg、jstat 等</li>
+<li>保存堆栈信息（保护现场很重要！）:<ul>
+<li>1.打印系统负载快照：<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">top -b -n 2 &gt; ./top.txt</span><br><span class="line">top -H -n 1 -p pid &gt; ./pid_top.txt</span><br></pre></td></tr></table></figure></li>
+<li>2.cpu升序打印进程对应线程列表：<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ps -mp pid -o THREAD,tid,time | sort -rn &gt; ./pid_threads.txt</span><br></pre></td></tr></table></figure></li>
+<li>3.查看tcp连接数 (最好多次采样)：<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">lsof -p pid &gt; ./pid_lsof.txt</span><br></pre></td></tr></table></figure></li>
+<li>4.查看线程信息 (最好多次采样)<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ps -mp pid -o THREAD,tid,time | sort -rn &gt; ./pid_threads.txt</span><br></pre></td></tr></table></figure></li>
+<li>5.查看堆内存占用概况<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmap -heap pid &gt; ./pid_jmap_heap.txt</span><br></pre></td></tr></table></figure></li>
+<li>6.查看堆中对象的统计信息<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmap -histo pid|head -n 100 &gt; ./pid_jmap_histo.txt</span><br></pre></td></tr></table></figure></li>
+<li>7.生产对堆快照Heap dump<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">堆中所有</span></span><br><span class="line">jmap -dump:format=b,file=./pid_jmap_heapdump.hprof</span><br><span class="line"><span class="meta">#</span><span class="bash">堆中存活对象（会产生full gc）</span></span><br><span class="line">jmap -dump:live,format=b,file=./pid_live_jmap_heapdump.hprof</span><br></pre></td></tr></table></figure></li>
+<li>8.查看GC统计信息<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jstat -gcutil pid &gt; ./pid_jstat_gc.txt</span><br></pre></td></tr></table></figure>
+
+</li>
+</ul>
+</li>
+</ul>
+<p><strong>4. 问题分析</strong></p>
+<ul>
+<li>分析cpu，内存占用情况，尤其是高耗能的进程、线程情况</li>
+<li>分析gc情况（Minor GC、Major GC、Full GC）</li>
+<li>分析JVM各个区的情况 Eden Space、s1/s2、Old Gen、MetaSpace</li>
+<li>分析问题进程、线程的堆栈信息</li>
+<li>分析堆快照</li>
+</ul>
+<p><strong>5. 原因探索和验证</strong></p>
+<ul>
+<li>大胆假设，小心求证</li>
+</ul>
+<p><strong>6. 解决方案</strong><br><strong>7. 参考文章</strong></p>
+<h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><p><a href="https://blog.csdn.net/u010648555/article/details/107051706" target="_blank" rel="noopener">https://blog.csdn.net/u010648555/article/details/107051706</a></p>
+<p><a href="https://www.iteye.com/blog/langzi-xl-798905" target="_blank" rel="noopener">https://www.iteye.com/blog/langzi-xl-798905</a></p>
+<p><a href="https://www.eclipse.org/mat/downloads.php" target="_blank" rel="noopener">https://www.eclipse.org/mat/downloads.php</a></p>
+<p><a href="https://github.com/openjdk/jdk" target="_blank" rel="noopener">https://github.com/openjdk/jdk</a></p>
+<p><a href="https://www.cnblogs.com/kongzhongqijing/articles/3625340.html" target="_blank" rel="noopener">https://www.cnblogs.com/kongzhongqijing/articles/3625340.html</a></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">JVM</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+	<div class="article-category tagcloud">
+		<i class="icon-book icon"></i>
+		<ul class="article-tag-list">
+			
+        		<li class="article-tag-list-item">
+        			<a href="/categories/Java/" class="article-tag-list-link color5">Java</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="/2020/07/09/20200709-java-jvm/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-20200610-devops-promethues-05" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -1129,6 +1347,10 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
             
               <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color1">Prometheus</a>
+              </li>
+            
+              <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color4">JVM</a>
               </li>
             
             <div class="clearfix"></div>
