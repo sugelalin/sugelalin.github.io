@@ -242,16 +242,19 @@
 <p>虽然看着分析的头头是道，但实际情况却是一开始我对 VisualVM 并不熟悉，上面VisualVM的这些分析，我都是事后根据MAT分析结果，重新分析推测出来的（好一个事后诸葛亮！）。</p>
 <p>但这并不妨碍我们借助MAT的分析结果，学习如何使用VisualVM，毕竟多一个朋友多一条路，多会一个工具多一种装逼的技能。</p>
 <h3 id="使用-MAT-Memory-Analyzer-Tool-分析-推荐"><a href="#使用-MAT-Memory-Analyzer-Tool-分析-推荐" class="headerlink" title="使用 MAT (Memory Analyzer Tool)分析 (推荐)"></a>使用 MAT (Memory Analyzer Tool)分析 (推荐)</h3><p>分析步骤：</p>
-<p><strong>1. 启动MAT</strong></p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">默认1024m</span></span><br><span class="line">./mat.app/Contents/MacOS/MemoryAnalyzer -vmargs– Xmx4G</span><br></pre></td></tr></table></figure>
+<p><strong>1. 安装 MAT</strong></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">a. 下载地址：https:&#x2F;&#x2F;www.eclipse.org&#x2F;mat&#x2F;downloads.php</span><br><span class="line"></span><br><span class="line">b. 选择 Mac OSX (Mac&#x2F;Cocoa&#x2F;x86_64) 版本，下载完成后解压得到 mat.app 目录</span><br></pre></td></tr></table></figure>
 
-<p><strong>2. 将heapdump.hprof装入虚拟机中</strong></p>
+<p><strong>2. 启动MAT</strong></p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./mat.app/Contents/MacOS/MemoryAnalyzer -vmargs– Xmx4G #默认1024m</span><br></pre></td></tr></table></figure>
+
+<p><strong>3. 将heapdump.hprof装入虚拟机中</strong></p>
 <p>MAT-图-1<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-01.jpg" alt="MAT-图-1"></p>
-<p><strong>3. 点击report –&gt; leak suspects –&gt; Description –&gt; Detail</strong></p>
+<p><strong>4. 点击report –&gt; leak suspects –&gt; Description –&gt; Detail</strong></p>
 <p>MAT-图-2<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-02.jpg" alt="MAT-图-2"></p>
-<p><strong>4. 最后追踪问题根源</strong></p>
+<p><strong>5. 最后追踪问题根源</strong></p>
 <p>MAT-图-3<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-03.jpg" alt="MAT-图-3"></p>
-<p><strong>5. 修复zipkin BUG，重启服务，一段时间后通过Grafana查看内存状况</strong></p>
+<p><strong>6. 修复zipkin BUG，重启服务，一段时间后通过Grafana查看内存状况</strong></p>
 <p>MAT-图-4<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-04.jpg" alt="MAT-图-4"></p>
 <p>MAT-图-5<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-05.jpg" alt="MAT-图-5"></p>
 <h3 id="分析工具对比"><a href="#分析工具对比" class="headerlink" title="分析工具对比"></a>分析工具对比</h3><ol>
