@@ -6,15 +6,18 @@
   <meta name="renderer" content="webkit">
   <meta http-equiv="X-UA-Compatible" content="IE=edge" >
   <link rel="dns-prefetch" href="http://yoursite.com">
-  <title>tags | Allen</title>
+  <title>问题博客模板-Java | Allen</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta property="og:type" content="website">
-<meta property="og:title" content="tags">
-<meta property="og:url" content="http://yoursite.com/tags/index.html">
+  <meta name="description" content="01. 问题现象 一般情况是收到报警信息，服务出现错误和异常 严重点是服务功能直接不可用  02. 环境说明 服务器OS、OS版本 服务部署情况 服务功能 相关依赖  03. 问题排查 检查服务状态和健康检查 查看日志：业务access&#x2F;error日志、服务stdout&#x2F;stderr日志、gc日志、系统日志&#x2F;var&#x2F;log&#x2F;message 等 查询服务器资源占用情况：top&#x2F;htop、dmesg、">
+<meta property="og:type" content="article">
+<meta property="og:title" content="问题博客模板-Java">
+<meta property="og:url" content="http://yoursite.com/2020/07/11/20200711-blog-template-javadebug/index.html">
 <meta property="og:site_name" content="Allen">
-<meta property="article:published_time" content="2020-06-04T12:06:34.000Z">
-<meta property="article:modified_time" content="2020-06-04T12:06:34.149Z">
+<meta property="og:description" content="01. 问题现象 一般情况是收到报警信息，服务出现错误和异常 严重点是服务功能直接不可用  02. 环境说明 服务器OS、OS版本 服务部署情况 服务功能 相关依赖  03. 问题排查 检查服务状态和健康检查 查看日志：业务access&#x2F;error日志、服务stdout&#x2F;stderr日志、gc日志、系统日志&#x2F;var&#x2F;log&#x2F;message 等 查询服务器资源占用情况：top&#x2F;htop、dmesg、">
+<meta property="article:published_time" content="2020-07-11T08:36:43.000Z">
+<meta property="article:modified_time" content="2020-07-11T08:50:15.145Z">
 <meta property="article:author" content="yulin">
+<meta property="article:tag" content="template">
 <meta name="twitter:card" content="summary">
   
     <link rel="alternative" href="/atom.xml" title="Allen" type="application/atom+xml">
@@ -155,27 +158,57 @@
             <canvas data-colors="#eaeaea" data-sectionHeight="100" data-contentId="js-content" id="myCanvas1" class="anm-canvas"></canvas>
           </div>
           <div id="js-content" class="content-ll">
-            <article id="page-" class="article article-type-page " itemscope itemprop="blogPost">
+            <article id="post-20200711-blog-template-javadebug" class="article article-type-post " itemscope itemprop="blogPost">
   <div class="article-inner">
     
       <header class="article-header">
         
   
     <h1 class="article-title" itemprop="name">
-      tags
+      问题博客模板-Java
     </h1>
   
 
         
-        <a href="/tags/index.html" class="archive-article-date">
-  	<time datetime="2020-06-04T12:06:34.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-06-04</time>
+        <a href="/2020/07/11/20200711-blog-template-javadebug/" class="archive-article-date">
+  	<time datetime="2020-07-11T08:36:43.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-07-11</time>
 </a>
         
       </header>
     
     <div class="article-entry" itemprop="articleBody">
       
-        
+        <h3 id="01-问题现象"><a href="#01-问题现象" class="headerlink" title="01. 问题现象"></a>01. 问题现象</h3><ol>
+<li>一般情况是收到报警信息，服务出现错误和异常</li>
+<li>严重点是服务功能直接不可用</li>
+</ol>
+<h3 id="02-环境说明"><a href="#02-环境说明" class="headerlink" title="02. 环境说明"></a>02. 环境说明</h3><ol>
+<li>服务器OS、OS版本</li>
+<li>服务部署情况</li>
+<li>服务功能</li>
+<li>相关依赖</li>
+</ol>
+<h3 id="03-问题排查"><a href="#03-问题排查" class="headerlink" title="03. 问题排查"></a>03. 问题排查</h3><ol>
+<li>检查服务状态和健康检查</li>
+<li>查看日志：业务access/error日志、服务stdout/stderr日志、gc日志、系统日志/var/log/message 等</li>
+<li>查询服务器资源占用情况：top/htop、dmesg、jstat 等</li>
+<li>导出各种堆栈信息（保护现场很重要！）</li>
+</ol>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">1、打印系统负载快照</span><br><span class="line">top -b -n 2 &gt; ./top.txt</span><br><span class="line">top -H -n 1 -p pid &gt; ./pid_top.txt</span><br><span class="line"></span><br><span class="line">2、cpu升序打印进程对应线程列表</span><br><span class="line">ps -mp pid -o THREAD,tid,time | sort -rn &gt; ./pid_threads.txt</span><br><span class="line"></span><br><span class="line">3、查看tcp连接数 (最好多次采样)：</span><br><span class="line">lsof -p pid &gt; ./pid_lsof.txt</span><br><span class="line"></span><br><span class="line">4、查看线程信息 (最好多次采样)</span><br><span class="line">ps -mp pid -o THREAD,tid,time | sort -rn &gt; ./pid_threads.txt</span><br><span class="line"></span><br><span class="line">5、查看堆内存占用概况</span><br><span class="line">jmap -heap pid &gt; ./pid_jmap_heap.txt</span><br><span class="line"></span><br><span class="line">6、查看堆中对象的统计信息</span><br><span class="line">map -histo pid|head -n 100 &gt; ./pid_jmap_histo.txt</span><br><span class="line"></span><br><span class="line">7、生产对堆快照Heap dump</span><br><span class="line"><span class="meta">#</span><span class="bash">堆中所有</span></span><br><span class="line">jmap -dump:format=b,file=./pid_jmap_heapdump.hprof</span><br><span class="line"><span class="meta">#</span><span class="bash">堆中存活对象（会产生full gc）</span></span><br><span class="line">jmap -dump:live,format=b,file=./pid_live_jmap_heapdump.hprof</span><br><span class="line"></span><br><span class="line">8、查看GC统计信息</span><br><span class="line">jstat -gcutil pid &gt; ./pid_jstat_gc.txt</span><br></pre></td></tr></table></figure>
+
+<h3 id="04-问题分析"><a href="#04-问题分析" class="headerlink" title="04. 问题分析"></a>04. 问题分析</h3><ol>
+<li>分析cpu，内存占用情况，尤其是高耗能的进程、线程情况</li>
+<li>分析gc情况（Minor GC、Major GC、Full GC）</li>
+<li>分析JVM各个区的情况 Eden Space、s1/s2、Old Gen、MetaSpace</li>
+<li>分析问题进程、线程的堆栈信息</li>
+<li>分析堆快照</li>
+</ol>
+<h3 id="05-原因探索和验证"><a href="#05-原因探索和验证" class="headerlink" title="05. 原因探索和验证"></a>05. 原因探索和验证</h3><p>大胆假设，小心求证</p>
+<h3 id="06-解决方案"><a href="#06-解决方案" class="headerlink" title="06. 解决方案"></a>06. 解决方案</h3><h3 id="07-参考文章"><a href="#07-参考文章" class="headerlink" title="07. 参考文章"></a>07. 参考文章</h3><ol>
+<li>资源连接地址</li>
+<li>参考博客地址，对原创者的尊重</li>
+</ol>
+
       
 
       
@@ -204,7 +237,29 @@
     <div class="article-info article-info-index">
       
       
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">template</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
       
+	<div class="article-category tagcloud">
+		<i class="icon-book icon"></i>
+		<ul class="article-tag-list">
+			
+        		<li class="article-tag-list-item">
+        			<a href="/categories/blog/" class="article-tag-list-link color5">blog</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
 
       
 
@@ -254,7 +309,7 @@
     <a class="close js-modal-close" href="javascript:;"><i class="icon icon-close"></i></a>
     <p>扫一扫，分享到微信</p>
     <div class="wx-qrcode">
-      <img src="//pan.baidu.com/share/qrcode?url=http://yoursite.com/tags/" alt="微信分享二维码">
+      <img src="//pan.baidu.com/share/qrcode?url=http://yoursite.com/2020/07/11/20200711-blog-template-javadebug/" alt="微信分享二维码">
     </div>
 </div>
 
@@ -266,6 +321,25 @@
 </article>
 
   
+<nav id="article-nav">
+  
+    <a href="/2020/07/11/20200711-blog-template-normal/" id="article-nav-newer" class="article-nav-link-wrap">
+      <i class="icon-circle-left"></i>
+      <div class="article-nav-title">
+        
+          普通博客模板
+        
+      </div>
+    </a>
+  
+  
+    <a href="/2020/07/09/20200709-java-jvm/" id="article-nav-older" class="article-nav-link-wrap">
+      <div class="article-nav-title">记一次线上 OOM Debug过程</div>
+      <i class="icon-circle-right"></i>
+    </a>
+  
+</nav>
+
 
 <aside class="wrap-side-operation">
     <div class="mod-side-operation">
@@ -317,7 +391,7 @@
 	var yiliaConfig = {
 		mathjax: false,
 		isHome: false,
-		isPost: false,
+		isPost: true,
 		isArchive: false,
 		isTag: false,
 		isCategory: false,
