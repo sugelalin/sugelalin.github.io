@@ -155,6 +155,235 @@
           <div id="js-content" class="content-ll">
             
   
+    <article id="post-20200711-java-jvm-jmap" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2020/07/12/20200711-java-jvm-jmap/">20200711-java-jvm-jmap</a>
+    </h1>
+  
+
+        
+        <a href="/2020/07/12/20200711-java-jvm-jmap/" class="archive-article-date">
+  	<time datetime="2020-07-12T09:39:10.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-07-12</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="01-前言"><a href="#01-前言" class="headerlink" title="01 前言"></a>01 前言</h2><p>在一次排查线上问题时，偶然发现 jmap -histo:live 会触发FULL GC，于是为了深入了解，对jmap的原理做了一次探索。</p>
+<h2 id="02-正文"><a href="#02-正文" class="headerlink" title="02 正文"></a>02 正文</h2><h3 id="测试环境"><a href="#测试环境" class="headerlink" title="测试环境"></a>测试环境</h3><p>Linux CentOS7、jdk8、64位</p>
+<h3 id="源码排查"><a href="#源码排查" class="headerlink" title="源码排查"></a>源码排查</h3><p>我们查看JMap源码</p>
+<p>包名：sun.tools.jmap<br>类名：JMap.java</p>
+<p>如图我们可以看到有两组参数<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200712-jvm-jmap-01.jpg" alt="jmap-图-1"></p>
+<p>在JMap中搜索 LIVE_HISTO_OPTION 即 ”-histo:live“ 可以发现，它和 ”-histo“  区别是 调用 histo(p1, p2) 是 p2的值不同</p>
+<p><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200712-jvm-jmap-02.jpg" alt="jmap-图-2"></p>
+<p>跟进查看 histo 方法，发现在调用heapHisto 方法是参数有变化</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">histo</span><span class="params">(String var0, <span class="keyword">boolean</span> var1)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">    VirtualMachine var2 = attach(var0);</span><br><span class="line">    InputStream var3 = ((HotSpotVirtualMachine)var2).heapHisto(<span class="keyword">new</span> Object[] &#123;var1 ? <span class="string">"-live"</span> : <span class="string">"-all"</span>&#125;);</span><br><span class="line">    drain(var2, var3);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>跟进查看 heapHisto 发现这个方法在是 sun.tools.attach.HotSpotVirtualMachine.java 类中。HotSpot就是当前归属于Oracle 公司，世界上使用最广泛的虚拟机。 HotSpotVirtualMachine 类继承的是 VirtualMachine  虚拟机类。</p>
+<p>在这里我们能看到，像dumpHeap、heapHisto 都被封装 executeCommand 函数调用。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> InputStream <span class="title">dumpHeap</span><span class="params">(Object... var1)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">this</span>.executeCommand(<span class="string">"dumpheap"</span>, var1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> InputStream <span class="title">heapHisto</span><span class="params">(Object... var1)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">this</span>.executeCommand(<span class="string">"inspectheap"</span>, var1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">abstract</span> InputStream <span class="title">execute</span><span class="params">(String var1, Object... var2)</span> <span class="keyword">throws</span> AgentLoadException, IOException</span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> InputStream <span class="title">executeCommand</span><span class="params">(String var1, Object... var2)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">this</span>.execute(var1, var2);</span><br><span class="line">    &#125; <span class="keyword">catch</span> (AgentLoadException var4) &#123;</span><br><span class="line">        <span class="keyword">throw</span> <span class="keyword">new</span> InternalError(<span class="string">"Should not get here"</span>, var4);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>executeCommand 来自抽象的 execute方法，它的实现类在 sun.tools.attach.BsdVirtualMachine.java 中，BsdVirtualMachine是HotSpotVirtualMachine 的子类，在其虚拟机功能的基础上实现了一些socket读、写等操作，可以实现与虚拟机的功能调用。</p>
+<p>到此，SDK部分就已经结束了，接下来我们看一下 HotSpot 的源码。</p>
+<p>源码下载方式，<a href="https://my.oschina.net/u/2518341/blog/1931088" target="_blank" rel="noopener">参考OSChina文章</a></p>
+<p>在 HotSpot 源码中<br>jdk/src/hotspot/share/services/attachListener.cpp</p>
+<p>与JDK中的方法映射<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200712-jvm-jmap-05.jpg" alt="jmap-图-5"></p>
+<p>dump_heap 方法的实现<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200712-jvm-jmap-03.jpg" alt="jmap-图-3"></p>
+<p>heap_inspection 方法的实现<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200712-jvm-jmap-04.jpg" alt="jmap-图-4"></p>
+<p>通过上面我们可以看到，JDK 中的 dumpheap 和 inspectheap 分别对应着 dump_heap 和 heap_inspection 的方法。而在其方法中，都会执行FULL GC。</p>
+<h2 id="03-总结"><a href="#03-总结" class="headerlink" title="03 总结"></a>03 总结</h2><p>jmap 在带 live 过滤参数时会执行FULL GC</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">jmap -histo:live pid </span><br><span class="line">jmap -dump:live,file=dump_001.bin pid</span><br></pre></td></tr></table></figure>
+
+<p>个人分析，这大概是因为需要过滤活跃的对象，而活跃的对象是时刻都在发生变化的，为了快速分离，jvm最简单的方法就是通过一次FULL GC清理掉不活跃的对象，然后导出。</p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">JVM</a>
+        		</li>
+      		 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color5">jmap</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+	<div class="article-category tagcloud">
+		<i class="icon-book icon"></i>
+		<ul class="article-tag-list">
+			
+        		<li class="article-tag-list-item">
+        			<a href="/categories/Java/" class="article-tag-list-link color5">Java</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="/2020/07/12/20200711-java-jvm-jmap/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-20200711-java-jvm-cmdtools" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2020/07/11/20200711-java-jvm-cmdtools/">JVM 命令行工具</a>
+    </h1>
+  
+
+        
+        <a href="/2020/07/11/20200711-java-jvm-cmdtools/" class="archive-article-date">
+  	<time datetime="2020-07-11T09:03:57.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-07-11</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="jstat"><a href="#jstat" class="headerlink" title="jstat"></a>jstat</h3><p>jstat 监控的内容有：类装载、内存、垃圾收集、jit编译的信息</p>
+<p>查看gc信息，间隔0.25s，共4次</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jstat -gc 7201 250 4</span><br></pre></td></tr></table></figure>
+<p>如果对每列指标所代表的的意义有所困惑，可以使用  <code>man jstat</code> 查看帮助手册，然后搜索<br><code>-gc option</code> 就得到如下信息：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">Garbage-collected heap statistics</span><br><span class="line"></span><br><span class="line">S0C: Current survivor space 0 capacity (kB).</span><br><span class="line">S1C: Current survivor space 1 capacity (kB).</span><br><span class="line">S0U: Survivor space 0 utilization (kB).</span><br><span class="line">S1U: Survivor space 1 utilization (kB).</span><br><span class="line"></span><br><span class="line">EC: Current eden space capacity (kB).</span><br><span class="line">EU: Eden space utilization (kB).</span><br><span class="line"></span><br><span class="line">OC: Current old space capacity (kB).</span><br><span class="line">OU: Old space utilization (kB).</span><br><span class="line"></span><br><span class="line">MC: Metaspace capacity (kB).</span><br><span class="line">MU: Metacspace utilization (kB).</span><br><span class="line"></span><br><span class="line">CCSC: Compressed class space capacity (kB).</span><br><span class="line">CCSU: Compressed class space used (kB).</span><br><span class="line">        </span><br><span class="line">YGC: Number of young generation garbage collection events.</span><br><span class="line">YGCT: Young generation garbage collection time.</span><br><span class="line">        </span><br><span class="line">FGC: Number of full GC events.</span><br><span class="line">FGCT: Full garbage collection time.</span><br><span class="line"></span><br><span class="line">GCT: Total garbage collection time.</span><br></pre></td></tr></table></figure>
+
+
+<h3 id="jmap"><a href="#jmap" class="headerlink" title="jmap"></a>jmap</h3><p>jmap查看堆内存</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmap -heap pid</span><br></pre></td></tr></table></figure>
+
+<p>查看堆内存中的对象数目、大小统计直方图，如果带上live则只统计活对象</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">jmap -histo:live pid </span><br><span class="line">或者</span><br><span class="line">jmap -dump:live,file=dump_001.bin pid</span><br></pre></td></tr></table></figure>
+<p>上面操作会触发FULL GC，运维必备。</p>
+<p>在排查线上问题是，先用jmap把进程内存使用情况dump到文件中，然后用jhat分析查看</p>
+<ol>
+<li><p>对进程内存dump<br><code>jmap -dump:format=b,file=/tmp/dump.hprof pid</code> </p>
+</li>
+<li><p>dump出来的文件可以用MIT Memory Analyzer Tool、VisualVM等工具查看，这里用jhat查看<br><code>jhat -port 9998 /tmp/dump.hprof</code></p>
+</li>
+<li><p>在浏览器中通过ip:port查看 默认端口7000</p>
+</li>
+</ol>
+<h3 id="jstack"><a href="#jstack" class="headerlink" title="jstack"></a>jstack</h3><p>jstack 查看Java进程内的线程堆栈信息</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jstack pid</span><br></pre></td></tr></table></figure>
+
+<h3 id="jinfo"><a href="#jinfo" class="headerlink" title="jinfo"></a>jinfo</h3><p>实时查看与调整虚拟机的各项参数</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jinfo pid</span><br></pre></td></tr></table></figure>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">JVM</a>
+        		</li>
+      		 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">Linux命令</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+	<div class="article-category tagcloud">
+		<i class="icon-book icon"></i>
+		<ul class="article-tag-list">
+			
+        		<li class="article-tag-list-item">
+        			<a href="/categories/Java/" class="article-tag-list-link color5">Java</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="/2020/07/11/20200711-java-jvm-cmdtools/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-20200711-blog-template-normal" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -392,7 +621,7 @@
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">jmap -histo:live pid </span><br><span class="line"><span class="meta">#</span><span class="bash">或者</span></span><br><span class="line">jmap -dump:live,file=dump_001.bin pid</span><br></pre></td></tr></table></figure>
 <p>具体原理详见 <a href="https://www.google.hk.com" target="_blank" rel="noopener">JVM 命令行工具 jmap gc分析</a></p>
 <p><strong>4. 非常幸运的是</strong></p>
-<p>另外一个同事大佬在我触发GC之前已经将内存堆dump出来了，这样就避免了我再次等待很长一段时间才能复现问题。而且他已使用MAT，将dump出来的heap.hprof分析得知，是由于zipkin2.reporter.InMemoryReporterMetrics 达到了1.6G导致的，并Google到一篇类似的文章-<a href="https://blog.csdn.net/u010648555/article/details/107051706" target="_blank" rel="noopener">zipkin2.reporter.InMemoryReporterMetrics导致服务器CPU100%及应用OOM问题排查和解决</a>，到此问题就基本定位了。</p>
+<p>另外一个同事大佬在我触发GC之前已经将内存堆dump出来了，这样就避免了我再次等待很长一段时间才能复现问题。而且他已使用MAT，将dump出来的heap.hprof分析得知，是由于zipkin2.reporter.InMemoryReporterMetrics 达到了1.6G导致的，并Google到一篇类似的文章-<a href="https://blog.csdn.net/u010648555/article/details/107051706" target="_blank" rel="noopener">zipkin2.reporter.InMemoryReporterMetrics导致服务器CPU100%及应用OOM问题排查和解决</a>，到此问题就基本定位到是zipkin的问题了。</p>
 <p><strong>5. 但是事情并没有结束</strong></p>
 <p>本菜本着 纸上得来终觉浅，绝知此事要躬行的原则，对此进行了进一步探索，没想到还有意外的发现。</p>
 <h2 id="探索"><a href="#探索" class="headerlink" title="探索"></a>探索</h2><p>上面说了，同事大佬已经将堆快照dump出来了，于是我灵机一动，将heapdump.hprof压缩下载到本地，一顿操作。</p>
@@ -433,15 +662,15 @@
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Connection refuesed （Connection refuesed）</span><br></pre></td></tr></table></figure>
 
 <p><strong>6. 然后再次在 类 视图中，选择 java.lang.Object[]，右键–&gt;在实例视图中显示</strong></p>
-<p>这时候由于实例中不一定都有哪些内容，因此我们要从实例视图中，根据实例大小，寻找大量重复出现的内容。</p>
-<p>在前几个折叠列表里面，没有找到，于是继续耐心寻找，终于在第5个折叠中找到大量的大小为 280和 64的实例</p>
-<p>VisualVM-图-5<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-vvm-051.jpg" alt="VisualVM-图-5"></p>
+<p>这时候由于实例中不一定都有哪些内容，因此我们要从实例视图中，根据实例大小寻找大量重复出现的内容。</p>
+<p>在前几个折叠列表里面没有找到，于是继续耐心寻找，终于在第5个折叠中找到大量的大小为 280和 64的实例，再往后上百万都是这样的实例对象。</p>
 <p>先看大小为64 的实例：</p>
-<p>另外，看图中 字段 一栏，有int[]、short[]、Object[]，这也 VisualVM-图-1相对应</p>
+<p>VisualVM-图-5<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-vvm-051.jpg" alt="VisualVM-图-5"></p>
+<p>另外，看图中 字段视图 一栏，有String、int[]、short[]、Object[]，这些都是Exception类的相关属性，在字段视图中可以找到对应的目标。<br>同时这也解释了 VisualVM-图-1 中前几列所示 int[]/Object等占用大量内存。</p>
 <p>再看大小为280 的实例：</p>
 <p>VisualVM-图-6<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-vvm-06.jpg" alt="VisualVM-图-6"></p>
 <p><strong>7. 这样 6中的两个实例视图正好和 4、5 的异常对应上</strong></p>
-<p>同时根据异常的信息，可以知道是zipkin地址的问题。然后经过检查项目中的代码，发现这个服务的zipkin服务地址没有配置，于是就默认是localhost:9411，这就难怪会报错了。将地址改为正确的地址后重启服务，恢复正常。</p>
+<p>同时根据异常的信息，可以知道是zipkin地址的问题。然后检查项目中的代码，发现这个服务的zipkin服务地址没有配置，于是就走了默认地址localhost:9411，这就难怪会报错了。将地址改为正确的地址后重启服务，恢复正常。</p>
 <p>虽然看着分析的头头是道，但实际情况却是一开始我对 VisualVM 并不熟悉，上面VisualVM的这些分析，我都是事后根据MAT分析结果，重新分析推测出来的（好一个事后诸葛亮！）。</p>
 <p>但这并不妨碍我们借助MAT的分析结果，学习如何使用VisualVM，毕竟多一个朋友多一条路，多会一个工具多一种装逼的技能。</p>
 <h3 id="使用-MAT-Memory-Analyzer-Tool-分析-推荐"><a href="#使用-MAT-Memory-Analyzer-Tool-分析-推荐" class="headerlink" title="使用 MAT (Memory Analyzer Tool)分析 (推荐)"></a>使用 MAT (Memory Analyzer Tool)分析 (推荐)</h3><p>分析步骤：</p>
@@ -461,56 +690,11 @@
 <p>MAT-图-4<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-04.jpg" alt="MAT-图-4"></p>
 <p>MAT-图-5<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-05.jpg" alt="MAT-图-5"></p>
 <h3 id="分析工具对比"><a href="#分析工具对比" class="headerlink" title="分析工具对比"></a>分析工具对比</h3><ol>
-<li>jconsole 适合开发时优化、监控本地jvm时使用，可以用来排查死锁</li>
-<li>jvisualvm 适合分析堆快照，相当于jstat/jmap/jstack/jhat/jinfo 五件套的可视化工具，另外可以在ide中安装 jvisualvm插件，在开发时用来优化jvm</li>
-<li>MAT 功能强大，十分推荐，很多功能还有待探索</li>
+<li>jconsole OpenJDK自带，适合开发时优化、监控本地jvm时使用，可以用来排查死锁</li>
+<li>jvisualvm OpenJDK自带，适合用于分析堆快照，相当于jstat/jmap/jstack/jhat/jinfo 五件套的可视化工具。另外可以在ide中安装 jvisualvm插件，在开发时jvm调优以及debug jvm相关问题。</li>
+<li>MAT 需要自行下载安装，安装步骤简单。功能强大，界面友好十分推荐，很多功能还有待探索</li>
 </ol>
-<h3 id="最后"><a href="#最后" class="headerlink" title="最后"></a>最后</h3><p>总结一下Java 排查线上问题的一般步骤</p>
-<p><strong>1. 问题现象</strong></p>
-<ul>
-<li>一般情况是收到报警信息，服务出现错误和异常</li>
-<li>严重点是服务功能直接不可用</li>
-</ul>
-<p><strong>2. 环境说明</strong></p>
-<ul>
-<li>服务器OS、OS版本</li>
-<li>服务部署情况</li>
-<li>服务功能</li>
-<li>相关依赖</li>
-</ul>
-<p><strong>3. 问题排查</strong></p>
-<ul>
-<li>检查服务状态和健康检查</li>
-<li>查看服务器日志：业务access/error日志、服务stdout/stderr日志、gc日志、系统日志/var/log/message</li>
-<li>查询服务器资源占用情况：top/htop、dmesg、jstat 等</li>
-<li>保存堆栈信息（保护现场很重要！）:<ul>
-<li>1.打印系统负载快照：<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">top -b -n 2 &gt; ./top.txt</span><br><span class="line">top -H -n 1 -p pid &gt; ./pid_top.txt</span><br></pre></td></tr></table></figure></li>
-<li>2.cpu升序打印进程对应线程列表：<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ps -mp pid -o THREAD,tid,time | sort -rn &gt; ./pid_threads.txt</span><br></pre></td></tr></table></figure></li>
-<li>3.查看tcp连接数 (最好多次采样)：<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">lsof -p pid &gt; ./pid_lsof.txt</span><br></pre></td></tr></table></figure></li>
-<li>4.查看线程信息 (最好多次采样)<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ps -mp pid -o THREAD,tid,time | sort -rn &gt; ./pid_threads.txt</span><br></pre></td></tr></table></figure></li>
-<li>5.查看堆内存占用概况<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmap -heap pid &gt; ./pid_jmap_heap.txt</span><br></pre></td></tr></table></figure></li>
-<li>6.查看堆中对象的统计信息<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmap -histo pid|head -n 100 &gt; ./pid_jmap_histo.txt</span><br></pre></td></tr></table></figure></li>
-<li>7.生产对堆快照Heap dump<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">堆中所有</span></span><br><span class="line">jmap -dump:format=b,file=./pid_jmap_heapdump.hprof</span><br><span class="line"><span class="meta">#</span><span class="bash">堆中存活对象（会产生full gc）</span></span><br><span class="line">jmap -dump:live,format=b,file=./pid_live_jmap_heapdump.hprof</span><br></pre></td></tr></table></figure></li>
-<li>8.查看GC统计信息<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jstat -gcutil pid &gt; ./pid_jstat_gc.txt</span><br></pre></td></tr></table></figure>
-
-</li>
-</ul>
-</li>
-</ul>
-<p><strong>4. 问题分析</strong></p>
-<ul>
-<li>分析cpu，内存占用情况，尤其是高耗能的进程、线程情况</li>
-<li>分析gc情况（Minor GC、Major GC、Full GC）</li>
-<li>分析JVM各个区的情况 Eden Space、s1/s2、Old Gen、MetaSpace</li>
-<li>分析问题进程、线程的堆栈信息</li>
-<li>分析堆快照</li>
-</ul>
-<p><strong>5. 原因探索和验证</strong></p>
-<ul>
-<li>大胆假设，小心求证</li>
-</ul>
-<p><strong>6. 解决方案</strong></p>
-<p><strong>7. 参考文章</strong></p>
+<h3 id="最后"><a href="#最后" class="headerlink" title="最后"></a>最后</h3><p>整理了一下Java 排查线上问题的一般步骤，<a href="https://sugelalin.github.io/2020/07/11/20200711-blog-template-javadebug/" target="_blank" rel="noopener">链接地址</a></p>
 <h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><p><a href="https://blog.csdn.net/u010648555/article/details/107051706" target="_blank" rel="noopener">https://blog.csdn.net/u010648555/article/details/107051706</a></p>
 <p><a href="https://www.iteye.com/blog/langzi-xl-798905" target="_blank" rel="noopener">https://www.iteye.com/blog/langzi-xl-798905</a></p>
 <p><a href="https://www.eclipse.org/mat/downloads.php" target="_blank" rel="noopener">https://www.eclipse.org/mat/downloads.php</a></p>
@@ -1196,261 +1380,10 @@
 
 
   
-    <article id="post-20200604-web-hexo-install" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
   
-    <h1 itemprop="name">
-      <a class="article-title" href="/2020/06/04/20200604-web-hexo-install/">部署 Hexo</a>
-    </h1>
-  
-
-        
-        <a href="/2020/06/04/20200604-web-hexo-install/" class="archive-article-date">
-  	<time datetime="2020-06-04T08:00:02.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-06-04</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>使用 hexo 搭建个人博客，并且可以根据喜好切换主题。</p>
-<h2 id="hexo-基础操作"><a href="#hexo-基础操作" class="headerlink" title="hexo 基础操作"></a>hexo 基础操作</h2><h3 id="新建仓库"><a href="#新建仓库" class="headerlink" title="新建仓库"></a>新建仓库</h3><p>创建 &lt;user-name&gt;.github.io 仓库，其中 &lt;user-name&gt; 只能是 github 昵称，我们需要以此免费获取博客域名。<br>比如我的博客：sugelalin.github.io</p>
-<h3 id="全局安装hexo"><a href="#全局安装hexo" class="headerlink" title="全局安装hexo"></a>全局安装hexo</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm install -g hexo</span><br></pre></td></tr></table></figure>
-
-<h3 id="初始化项目"><a href="#初始化项目" class="headerlink" title="初始化项目"></a>初始化项目</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo init</span><br></pre></td></tr></table></figure>
-
-<p>// 本地运行</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo s</span><br></pre></td></tr></table></figure>
-
-<h3 id="部署到github"><a href="#部署到github" class="headerlink" title="部署到github"></a>部署到github</h3><p>根目录下修改 _congif.yml 的 deploy 配置</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">deploy:</span><br><span class="line">  <span class="built_in">type</span>: git</span><br><span class="line">  repo: https://github.com/sugelalin/sugelalin.github.io.git</span><br><span class="line">  branch: master</span><br></pre></td></tr></table></figure>
-
-<p>安装部署工具：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm install hexo-deployer-git --save</span><br></pre></td></tr></table></figure>
-
-<p>清理缓存文件</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo clean</span><br></pre></td></tr></table></figure>
-
-<p>项目部署</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>部署成功后可通过项目名称： <a href="https://sugelalin.github.io" target="_blank" rel="noopener">https://sugelalin.github.io</a> 访问</p>
-<h2 id="hexo-高阶操作"><a href="#hexo-高阶操作" class="headerlink" title="hexo 高阶操作"></a>hexo 高阶操作</h2><h3 id="项目布局"><a href="#项目布局" class="headerlink" title="项目布局"></a>项目布局</h3><p>[layout] 为布局，可选项为 <code>post</code>、<code>page</code>、<code>draft</code>，这将决定文章所在文件路径<br>&lt;title&gt; 为文章标题 </p>
-<p>格式：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo new [layout] \&lt;title\&gt;</span><br></pre></td></tr></table></figure>
-
-<p>示例：<br>新建文章</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo new post article-name</span><br></pre></td></tr></table></figure>
-
-<h3 id="添加标签"><a href="#添加标签" class="headerlink" title="添加标签"></a>添加标签</h3><p>生成分类文件 source/tags/index.md</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo new page tags</span><br></pre></td></tr></table></figure>
-
-<p>添加type:</p>
-<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="bullet">- </span>- -</span><br><span class="line">title: 文章标签</span><br><span class="line">date: 2020-06-04 16:00:00</span><br><span class="line">type: "tags"</span><br><span class="line"><span class="bullet">- </span>- -</span><br></pre></td></tr></table></figure>
-
-<h3 id="添加分类"><a href="#添加分类" class="headerlink" title="添加分类"></a>添加分类</h3><p>生成分类文件 source/categories/index.md</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo new page categories</span><br></pre></td></tr></table></figure>
-
-<p>添加type:</p>
-<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="bullet">- </span>- -</span><br><span class="line">title: 文章分类</span><br><span class="line">date: 2020-06-04 16:00:00</span><br><span class="line">type: "categories"</span><br><span class="line"><span class="bullet">- </span>- -</span><br></pre></td></tr></table></figure>
-
-<p>修改文章生成的模板文件<br>修改 scaffolds/post.md ， 添加 tags 和 categories</p>
-<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="bullet">- </span>- -</span><br><span class="line">title: &#123;&#123; title &#125;&#125;</span><br><span class="line">date: &#123;&#123; date &#125;&#125;</span><br><span class="line">tags: </span><br><span class="line">categories: </span><br><span class="line"><span class="bullet">- </span>- -</span><br></pre></td></tr></table></figure>
-
-
-<p>在文章中使用标签和分类</p>
-<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="bullet">- </span>- -</span><br><span class="line">title: 文章标题</span><br><span class="line">date: 2020-06-04 16:00:00</span><br><span class="line">categories: </span><br><span class="line"><span class="bullet">- </span>前端</span><br><span class="line">tags: </span><br><span class="line"><span class="bullet">- </span>web前端</span><br><span class="line"><span class="bullet">- </span>hexo</span><br><span class="line"><span class="bullet">- </span>- -</span><br></pre></td></tr></table></figure>
-
-<h3 id="添加归档"><a href="#添加归档" class="headerlink" title="添加归档"></a>添加归档</h3><p>生成分类文件 source/archives/index.md</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">hexo new page archives</span><br></pre></td></tr></table></figure>
-
-<p>添加type:</p>
-<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="bullet">- </span>- -</span><br><span class="line">title: 文章分类</span><br><span class="line">date: 2020-06-04 16:00:00</span><br><span class="line">type: "archives"</span><br><span class="line"><span class="bullet">- </span>- -</span><br></pre></td></tr></table></figure>
-
-<p>修改主题 _config.yml 配置</p>
-<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">menu:</span><br><span class="line">  主页: /</span><br><span class="line">  归档: /archives/</span><br></pre></td></tr></table></figure>
-
-<h3 id="修改主题"><a href="#修改主题" class="headerlink" title="修改主题"></a>修改主题</h3><p>下载主题到themes文件夹下</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git <span class="built_in">clone</span> https://github.com/litten/hexo-theme-yilia.git themes/yilia</span><br></pre></td></tr></table></figure>
-
-<p>修改项目 _config.yml 配置</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">theme: yilia</span><br></pre></td></tr></table></figure>
-
-<h3 id="部署优化"><a href="#部署优化" class="headerlink" title="部署优化"></a>部署优化</h3><p>每次都要执行 hexo clean 和 hexo deploy，合并为新脚本</p>
-<p>在 package.json 的script 中添加如下：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="string">"dev"</span>: <span class="string">"hexo s"</span>,</span><br><span class="line"><span class="string">"build"</span>: <span class="string">"hexo clean &amp; hexo deploy"</span></span><br></pre></td></tr></table></figure>
-
-<p>部署命令</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm run build</span><br></pre></td></tr></table></figure>
-
-<h3 id="接入评论系统-valine"><a href="#接入评论系统-valine" class="headerlink" title="接入评论系统 -valine"></a>接入评论系统 -valine</h3><p><a href="https://valine.js.org/quickstart.html" target="_blank" rel="noopener">valine地址</a></p>
-<h3 id="其他"><a href="#其他" class="headerlink" title="其他"></a>其他</h3><p>a. 解决主题BUG：yilia主题分类跳转多了个 /<br>去掉 themes/yilia/layout/_partial/post/category.ejs 文件中，tag.path 前面的 /</p>
-<p>b. hexo 排序是依据文章的 date 降序排列；若date 值相同，就按文章文件的创建时间升序排列</p>
-<p>本文参考：<br><a href="https://www.jianshu.com/p/390f202c5b0e" target="_blank" rel="noopener">https://www.jianshu.com/p/390f202c5b0e</a><br><a href="https://www.jianshu.com/p/e17711e44e00" target="_blank" rel="noopener">https://www.jianshu.com/p/e17711e44e00</a></p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color5">hexo</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-	<div class="article-category tagcloud">
-		<i class="icon-book icon"></i>
-		<ul class="article-tag-list">
-			
-        		<li class="article-tag-list-item">
-        			<a href="/categories/前端/" class="article-tag-list-link color3">前端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="/2020/06/04/20200604-web-hexo-install/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
-    <article id="post-hello-world" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2020/06/04/hello-world/">使用 Hexo 创作</a>
-    </h1>
-  
-
-        
-        <a href="/2020/06/04/hello-world/" class="archive-article-date">
-  	<time datetime="2020-06-04T08:00:01.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-06-04</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>Welcome to <a href="https://hexo.io/" target="_blank" rel="noopener">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/" target="_blank" rel="noopener">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html" target="_blank" rel="noopener">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues" target="_blank" rel="noopener">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">"My New Post"</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/writing.html" target="_blank" rel="noopener">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/server.html" target="_blank" rel="noopener">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/generating.html" target="_blank" rel="noopener">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo clean &amp;&amp; hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html" target="_blank" rel="noopener">Deployment</a></p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color5">hexo</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-	<div class="article-category tagcloud">
-		<i class="icon-book icon"></i>
-		<ul class="article-tag-list">
-			
-        		<li class="article-tag-list-item">
-        			<a href="/categories/前端/" class="article-tag-list-link color3">前端</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="/2020/06/04/hello-world/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
+    <nav id="page-nav">
+      <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><a class="extend next" rel="next" href="/page/2/">Next &amp;raquo;</a>
+    </nav>
   
 
 
@@ -1553,7 +1486,7 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
               </li>
             
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color5">hexo</a>
+                <a href="javascript:void(0)" class="js-tag color4">JVM</a>
               </li>
             
               <li class="article-tag-list-item">
@@ -1561,7 +1494,15 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
               </li>
             
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color4">JVM</a>
+                <a href="javascript:void(0)" class="js-tag color5">hexo</a>
+              </li>
+            
+              <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color5">jmap</a>
+              </li>
+            
+              <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color3">Linux命令</a>
               </li>
             
             <div class="clearfix"></div>

@@ -26,7 +26,7 @@
 <meta property="og:image" content="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-04.jpg">
 <meta property="og:image" content="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-05.jpg">
 <meta property="article:published_time" content="2020-07-09T08:51:31.000Z">
-<meta property="article:modified_time" content="2020-07-11T07:20:27.632Z">
+<meta property="article:modified_time" content="2020-07-11T09:21:06.695Z">
 <meta property="article:author" content="yulin">
 <meta property="article:tag" content="JVM">
 <meta name="twitter:card" content="summary">
@@ -204,7 +204,7 @@
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">jmap -histo:live pid </span><br><span class="line"><span class="meta">#</span><span class="bash">或者</span></span><br><span class="line">jmap -dump:live,file=dump_001.bin pid</span><br></pre></td></tr></table></figure>
 <p>具体原理详见 <a href="https://www.google.hk.com" target="_blank" rel="noopener">JVM 命令行工具 jmap gc分析</a></p>
 <p><strong>4. 非常幸运的是</strong></p>
-<p>另外一个同事大佬在我触发GC之前已经将内存堆dump出来了，这样就避免了我再次等待很长一段时间才能复现问题。而且他已使用MAT，将dump出来的heap.hprof分析得知，是由于zipkin2.reporter.InMemoryReporterMetrics 达到了1.6G导致的，并Google到一篇类似的文章-<a href="https://blog.csdn.net/u010648555/article/details/107051706" target="_blank" rel="noopener">zipkin2.reporter.InMemoryReporterMetrics导致服务器CPU100%及应用OOM问题排查和解决</a>，到此问题就基本定位了。</p>
+<p>另外一个同事大佬在我触发GC之前已经将内存堆dump出来了，这样就避免了我再次等待很长一段时间才能复现问题。而且他已使用MAT，将dump出来的heap.hprof分析得知，是由于zipkin2.reporter.InMemoryReporterMetrics 达到了1.6G导致的，并Google到一篇类似的文章-<a href="https://blog.csdn.net/u010648555/article/details/107051706" target="_blank" rel="noopener">zipkin2.reporter.InMemoryReporterMetrics导致服务器CPU100%及应用OOM问题排查和解决</a>，到此问题就基本定位到是zipkin的问题了。</p>
 <p><strong>5. 但是事情并没有结束</strong></p>
 <p>本菜本着 纸上得来终觉浅，绝知此事要躬行的原则，对此进行了进一步探索，没想到还有意外的发现。</p>
 <h2 id="探索"><a href="#探索" class="headerlink" title="探索"></a>探索</h2><p>上面说了，同事大佬已经将堆快照dump出来了，于是我灵机一动，将heapdump.hprof压缩下载到本地，一顿操作。</p>
@@ -245,15 +245,15 @@
 <figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Connection refuesed （Connection refuesed）</span><br></pre></td></tr></table></figure>
 
 <p><strong>6. 然后再次在 类 视图中，选择 java.lang.Object[]，右键–&gt;在实例视图中显示</strong></p>
-<p>这时候由于实例中不一定都有哪些内容，因此我们要从实例视图中，根据实例大小，寻找大量重复出现的内容。</p>
-<p>在前几个折叠列表里面，没有找到，于是继续耐心寻找，终于在第5个折叠中找到大量的大小为 280和 64的实例</p>
-<p>VisualVM-图-5<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-vvm-051.jpg" alt="VisualVM-图-5"></p>
+<p>这时候由于实例中不一定都有哪些内容，因此我们要从实例视图中，根据实例大小寻找大量重复出现的内容。</p>
+<p>在前几个折叠列表里面没有找到，于是继续耐心寻找，终于在第5个折叠中找到大量的大小为 280和 64的实例，再往后上百万都是这样的实例对象。</p>
 <p>先看大小为64 的实例：</p>
-<p>另外，看图中 字段 一栏，有int[]、short[]、Object[]，这也 VisualVM-图-1相对应</p>
+<p>VisualVM-图-5<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-vvm-051.jpg" alt="VisualVM-图-5"></p>
+<p>另外，看图中 字段视图 一栏，有String、int[]、short[]、Object[]，这些都是Exception类的相关属性，在字段视图中可以找到对应的目标。<br>同时这也解释了 VisualVM-图-1 中前几列所示 int[]/Object等占用大量内存。</p>
 <p>再看大小为280 的实例：</p>
 <p>VisualVM-图-6<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-vvm-06.jpg" alt="VisualVM-图-6"></p>
 <p><strong>7. 这样 6中的两个实例视图正好和 4、5 的异常对应上</strong></p>
-<p>同时根据异常的信息，可以知道是zipkin地址的问题。然后经过检查项目中的代码，发现这个服务的zipkin服务地址没有配置，于是就默认是localhost:9411，这就难怪会报错了。将地址改为正确的地址后重启服务，恢复正常。</p>
+<p>同时根据异常的信息，可以知道是zipkin地址的问题。然后检查项目中的代码，发现这个服务的zipkin服务地址没有配置，于是就走了默认地址localhost:9411，这就难怪会报错了。将地址改为正确的地址后重启服务，恢复正常。</p>
 <p>虽然看着分析的头头是道，但实际情况却是一开始我对 VisualVM 并不熟悉，上面VisualVM的这些分析，我都是事后根据MAT分析结果，重新分析推测出来的（好一个事后诸葛亮！）。</p>
 <p>但这并不妨碍我们借助MAT的分析结果，学习如何使用VisualVM，毕竟多一个朋友多一条路，多会一个工具多一种装逼的技能。</p>
 <h3 id="使用-MAT-Memory-Analyzer-Tool-分析-推荐"><a href="#使用-MAT-Memory-Analyzer-Tool-分析-推荐" class="headerlink" title="使用 MAT (Memory Analyzer Tool)分析 (推荐)"></a>使用 MAT (Memory Analyzer Tool)分析 (推荐)</h3><p>分析步骤：</p>
@@ -273,56 +273,11 @@
 <p>MAT-图-4<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-04.jpg" alt="MAT-图-4"></p>
 <p>MAT-图-5<br><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200710-jvm-oom-mat-05.jpg" alt="MAT-图-5"></p>
 <h3 id="分析工具对比"><a href="#分析工具对比" class="headerlink" title="分析工具对比"></a>分析工具对比</h3><ol>
-<li>jconsole 适合开发时优化、监控本地jvm时使用，可以用来排查死锁</li>
-<li>jvisualvm 适合分析堆快照，相当于jstat/jmap/jstack/jhat/jinfo 五件套的可视化工具，另外可以在ide中安装 jvisualvm插件，在开发时用来优化jvm</li>
-<li>MAT 功能强大，十分推荐，很多功能还有待探索</li>
+<li>jconsole OpenJDK自带，适合开发时优化、监控本地jvm时使用，可以用来排查死锁</li>
+<li>jvisualvm OpenJDK自带，适合用于分析堆快照，相当于jstat/jmap/jstack/jhat/jinfo 五件套的可视化工具。另外可以在ide中安装 jvisualvm插件，在开发时jvm调优以及debug jvm相关问题。</li>
+<li>MAT 需要自行下载安装，安装步骤简单。功能强大，界面友好十分推荐，很多功能还有待探索</li>
 </ol>
-<h3 id="最后"><a href="#最后" class="headerlink" title="最后"></a>最后</h3><p>总结一下Java 排查线上问题的一般步骤</p>
-<p><strong>1. 问题现象</strong></p>
-<ul>
-<li>一般情况是收到报警信息，服务出现错误和异常</li>
-<li>严重点是服务功能直接不可用</li>
-</ul>
-<p><strong>2. 环境说明</strong></p>
-<ul>
-<li>服务器OS、OS版本</li>
-<li>服务部署情况</li>
-<li>服务功能</li>
-<li>相关依赖</li>
-</ul>
-<p><strong>3. 问题排查</strong></p>
-<ul>
-<li>检查服务状态和健康检查</li>
-<li>查看服务器日志：业务access/error日志、服务stdout/stderr日志、gc日志、系统日志/var/log/message</li>
-<li>查询服务器资源占用情况：top/htop、dmesg、jstat 等</li>
-<li>保存堆栈信息（保护现场很重要！）:<ul>
-<li>1.打印系统负载快照：<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">top -b -n 2 &gt; ./top.txt</span><br><span class="line">top -H -n 1 -p pid &gt; ./pid_top.txt</span><br></pre></td></tr></table></figure></li>
-<li>2.cpu升序打印进程对应线程列表：<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ps -mp pid -o THREAD,tid,time | sort -rn &gt; ./pid_threads.txt</span><br></pre></td></tr></table></figure></li>
-<li>3.查看tcp连接数 (最好多次采样)：<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">lsof -p pid &gt; ./pid_lsof.txt</span><br></pre></td></tr></table></figure></li>
-<li>4.查看线程信息 (最好多次采样)<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ps -mp pid -o THREAD,tid,time | sort -rn &gt; ./pid_threads.txt</span><br></pre></td></tr></table></figure></li>
-<li>5.查看堆内存占用概况<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmap -heap pid &gt; ./pid_jmap_heap.txt</span><br></pre></td></tr></table></figure></li>
-<li>6.查看堆中对象的统计信息<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmap -histo pid|head -n 100 &gt; ./pid_jmap_histo.txt</span><br></pre></td></tr></table></figure></li>
-<li>7.生产对堆快照Heap dump<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span><span class="bash">堆中所有</span></span><br><span class="line">jmap -dump:format=b,file=./pid_jmap_heapdump.hprof</span><br><span class="line"><span class="meta">#</span><span class="bash">堆中存活对象（会产生full gc）</span></span><br><span class="line">jmap -dump:live,format=b,file=./pid_live_jmap_heapdump.hprof</span><br></pre></td></tr></table></figure></li>
-<li>8.查看GC统计信息<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jstat -gcutil pid &gt; ./pid_jstat_gc.txt</span><br></pre></td></tr></table></figure>
-
-</li>
-</ul>
-</li>
-</ul>
-<p><strong>4. 问题分析</strong></p>
-<ul>
-<li>分析cpu，内存占用情况，尤其是高耗能的进程、线程情况</li>
-<li>分析gc情况（Minor GC、Major GC、Full GC）</li>
-<li>分析JVM各个区的情况 Eden Space、s1/s2、Old Gen、MetaSpace</li>
-<li>分析问题进程、线程的堆栈信息</li>
-<li>分析堆快照</li>
-</ul>
-<p><strong>5. 原因探索和验证</strong></p>
-<ul>
-<li>大胆假设，小心求证</li>
-</ul>
-<p><strong>6. 解决方案</strong></p>
-<p><strong>7. 参考文章</strong></p>
+<h3 id="最后"><a href="#最后" class="headerlink" title="最后"></a>最后</h3><p>整理了一下Java 排查线上问题的一般步骤，<a href="https://sugelalin.github.io/2020/07/11/20200711-blog-template-javadebug/" target="_blank" rel="noopener">链接地址</a></p>
 <h3 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h3><p><a href="https://blog.csdn.net/u010648555/article/details/107051706" target="_blank" rel="noopener">https://blog.csdn.net/u010648555/article/details/107051706</a></p>
 <p><a href="https://www.iteye.com/blog/langzi-xl-798905" target="_blank" rel="noopener">https://www.iteye.com/blog/langzi-xl-798905</a></p>
 <p><a href="https://www.eclipse.org/mat/downloads.php" target="_blank" rel="noopener">https://www.eclipse.org/mat/downloads.php</a></p>
@@ -589,7 +544,7 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
               </li>
             
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color5">hexo</a>
+                <a href="javascript:void(0)" class="js-tag color4">JVM</a>
               </li>
             
               <li class="article-tag-list-item">
@@ -597,7 +552,15 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
               </li>
             
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color4">JVM</a>
+                <a href="javascript:void(0)" class="js-tag color5">hexo</a>
+              </li>
+            
+              <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color5">jmap</a>
+              </li>
+            
+              <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color3">Linux命令</a>
               </li>
             
             <div class="clearfix"></div>

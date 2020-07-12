@@ -6,13 +6,19 @@
   <meta name="renderer" content="webkit">
   <meta http-equiv="X-UA-Compatible" content="IE=edge" >
   <link rel="dns-prefetch" href="http://yoursite.com">
-  <title>Archives: 2020/7 | Allen</title>
+  <title>JVM 命令行工具 | Allen</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta property="og:type" content="website">
-<meta property="og:title" content="Allen">
-<meta property="og:url" content="http://yoursite.com/archives/2020/07/index.html">
+  <meta name="description" content="jstatjstat 监控的内容有：类装载、内存、垃圾收集、jit编译的信息 查看gc信息，间隔0.25s，共4次 1jstat -gc 7201 250 4 如果对每列指标所代表的的意义有所困惑，可以使用  man jstat 查看帮助手册，然后搜索-gc option 就得到如下信息： 1234567891011121314151617181920212223242526Garbage-col">
+<meta property="og:type" content="article">
+<meta property="og:title" content="JVM 命令行工具">
+<meta property="og:url" content="http://yoursite.com/2020/07/11/20200711-java-jvm-cmdtools/index.html">
 <meta property="og:site_name" content="Allen">
+<meta property="og:description" content="jstatjstat 监控的内容有：类装载、内存、垃圾收集、jit编译的信息 查看gc信息，间隔0.25s，共4次 1jstat -gc 7201 250 4 如果对每列指标所代表的的意义有所困惑，可以使用  man jstat 查看帮助手册，然后搜索-gc option 就得到如下信息： 1234567891011121314151617181920212223242526Garbage-col">
+<meta property="article:published_time" content="2020-07-11T09:03:57.000Z">
+<meta property="article:modified_time" content="2020-07-12T09:38:43.246Z">
 <meta property="article:author" content="yulin">
+<meta property="article:tag" content="JVM">
+<meta property="article:tag" content="Linux命令">
 <meta name="twitter:card" content="summary">
   
     <link rel="alternative" href="/atom.xml" title="Allen" type="application/atom+xml">
@@ -153,89 +159,82 @@
             <canvas data-colors="#eaeaea" data-sectionHeight="100" data-contentId="js-content" id="myCanvas1" class="anm-canvas"></canvas>
           </div>
           <div id="js-content" class="content-ll">
-            
-  
-  
+            <article id="post-20200711-java-jvm-cmdtools" class="article article-type-post " itemscope itemprop="blogPost">
+  <div class="article-inner">
     
-    
-      
-      
-      <section class="archives-wrap">
-        <div class="archive-year-wrap">
-          <a href="/archives/2020" class="archive-year">2020</a>
-        </div>
-        <div class="archives">
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2020/07/12/20200711-java-jvm-jmap/" class="archive-article-date">
-  	<time datetime="2020-07-12T09:39:10.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-07-12</time>
-</a>
-        </div>
-    	 
+      <header class="article-header">
+        
   
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2020/07/12/20200711-java-jvm-jmap/">20200711-java-jvm-jmap</a>
+    <h1 class="article-title" itemprop="name">
+      JVM 命令行工具
     </h1>
   
 
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">JVM</a>
-        		</li>
-      		 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color5">jmap</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-	<div class="article-category tagcloud">
-		<i class="icon-book icon"></i>
-		<ul class="article-tag-list">
-			
-        		<li class="article-tag-list-item">
-        			<a href="/categories/Java/" class="article-tag-list-link color5">Java</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2020/07/11/20200711-java-jvm-cmdtools/" class="archive-article-date">
+        
+        <a href="/2020/07/11/20200711-java-jvm-cmdtools/" class="archive-article-date">
   	<time datetime="2020-07-11T09:03:57.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-07-11</time>
 </a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2020/07/11/20200711-java-jvm-cmdtools/">JVM 命令行工具</a>
-    </h1>
-  
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h3 id="jstat"><a href="#jstat" class="headerlink" title="jstat"></a>jstat</h3><p>jstat 监控的内容有：类装载、内存、垃圾收集、jit编译的信息</p>
+<p>查看gc信息，间隔0.25s，共4次</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jstat -gc 7201 250 4</span><br></pre></td></tr></table></figure>
+<p>如果对每列指标所代表的的意义有所困惑，可以使用  <code>man jstat</code> 查看帮助手册，然后搜索<br><code>-gc option</code> 就得到如下信息：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">Garbage-collected heap statistics</span><br><span class="line"></span><br><span class="line">S0C: Current survivor space 0 capacity (kB).</span><br><span class="line">S1C: Current survivor space 1 capacity (kB).</span><br><span class="line">S0U: Survivor space 0 utilization (kB).</span><br><span class="line">S1U: Survivor space 1 utilization (kB).</span><br><span class="line"></span><br><span class="line">EC: Current eden space capacity (kB).</span><br><span class="line">EU: Eden space utilization (kB).</span><br><span class="line"></span><br><span class="line">OC: Current old space capacity (kB).</span><br><span class="line">OU: Old space utilization (kB).</span><br><span class="line"></span><br><span class="line">MC: Metaspace capacity (kB).</span><br><span class="line">MU: Metacspace utilization (kB).</span><br><span class="line"></span><br><span class="line">CCSC: Compressed class space capacity (kB).</span><br><span class="line">CCSU: Compressed class space used (kB).</span><br><span class="line">        </span><br><span class="line">YGC: Number of young generation garbage collection events.</span><br><span class="line">YGCT: Young generation garbage collection time.</span><br><span class="line">        </span><br><span class="line">FGC: Number of full GC events.</span><br><span class="line">FGCT: Full garbage collection time.</span><br><span class="line"></span><br><span class="line">GCT: Total garbage collection time.</span><br></pre></td></tr></table></figure>
 
-        <div class="article-info info-on-right">
-          
+
+<h3 id="jmap"><a href="#jmap" class="headerlink" title="jmap"></a>jmap</h3><p>jmap查看堆内存</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmap -heap pid</span><br></pre></td></tr></table></figure>
+
+<p>查看堆内存中的对象数目、大小统计直方图，如果带上live则只统计活对象</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">jmap -histo:live pid </span><br><span class="line">或者</span><br><span class="line">jmap -dump:live,file=dump_001.bin pid</span><br></pre></td></tr></table></figure>
+<p>上面操作会触发FULL GC，运维必备。</p>
+<p>在排查线上问题是，先用jmap把进程内存使用情况dump到文件中，然后用jhat分析查看</p>
+<ol>
+<li><p>对进程内存dump<br><code>jmap -dump:format=b,file=/tmp/dump.hprof pid</code> </p>
+</li>
+<li><p>dump出来的文件可以用MIT Memory Analyzer Tool、VisualVM等工具查看，这里用jhat查看<br><code>jhat -port 9998 /tmp/dump.hprof</code></p>
+</li>
+<li><p>在浏览器中通过ip:port查看 默认端口7000</p>
+</li>
+</ol>
+<h3 id="jstack"><a href="#jstack" class="headerlink" title="jstack"></a>jstack</h3><p>jstack 查看Java进程内的线程堆栈信息</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jstack pid</span><br></pre></td></tr></table></figure>
+
+<h3 id="jinfo"><a href="#jinfo" class="headerlink" title="jinfo"></a>jinfo</h3><p>实时查看与调整虚拟机的各项参数</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jinfo pid</span><br></pre></td></tr></table></figure>
+
+      
+
+      
+        <div class="page-reward">
+          <a href="javascript:;" class="page-reward-btn tooltip-top">
+            <div class="tooltip tooltip-east">
+            <span class="tooltip-item">
+              赏
+            </span>
+            <span class="tooltip-content">
+              <span class="tooltip-text">
+                <span class="tooltip-inner">
+                  <p class="reward-p"><i class="icon icon-quo-left"></i>承蒙打赏<i class="icon icon-quo-right"></i></p>
+                  <div class="reward-box">
+                    
+                    
+                  </div>
+                </span>
+              </span>
+            </span>
+          </div>
+          </a>
+        </div>
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
 	<div class="article-tag tagcloud">
 		<i class="icon-price-tags icon"></i>
 		<ul class="article-tag-list">
@@ -251,7 +250,7 @@
 		</ul>
 	</div>
 
-          
+      
 	<div class="article-category tagcloud">
 		<i class="icon-book icon"></i>
 		<ul class="article-tag-list">
@@ -264,164 +263,113 @@
 	</div>
 
 
+      
+
+      
+        
+<div class="share-btn share-icons tooltip-left">
+  <div class="tooltip tooltip-east">
+    <span class="tooltip-item">
+      <a href="javascript:;" class="share-sns share-outer">
+        <i class="icon icon-share"></i>
+      </a>
+    </span>
+    <span class="tooltip-content">
+      <div class="share-wrap">
+        <div class="share-icons">
+          <a class="weibo share-sns" href="javascript:;" data-type="weibo">
+            <i class="icon icon-weibo"></i>
+          </a>
+          <a class="weixin share-sns wxFab" href="javascript:;" data-type="weixin">
+            <i class="icon icon-weixin"></i>
+          </a>
+          <a class="qq share-sns" href="javascript:;" data-type="qq">
+            <i class="icon icon-qq"></i>
+          </a>
+          <a class="douban share-sns" href="javascript:;" data-type="douban">
+            <i class="icon icon-douban"></i>
+          </a>
+          <a class="qzone share-sns" href="javascript:;" data-type="qzone">
+            <i class="icon icon-qzone"></i>
+          </a>
+          <a class="facebook share-sns" href="javascript:;" data-type="facebook">
+            <i class="icon icon-facebook"></i>
+          </a>
+          <a class="twitter share-sns" href="javascript:;" data-type="twitter">
+            <i class="icon icon-twitter"></i>
+          </a>
+          <a class="google share-sns" href="javascript:;" data-type="google">
+            <i class="icon icon-google"></i>
+          </a>
         </div>
-        <div class="clearfix"></div>
-    </header>
+      </div>
+    </span>
+  </div>
+</div>
+
+<div class="page-modal wx-share js-wx-box">
+    <a class="close js-modal-close" href="javascript:;"><i class="icon icon-close"></i></a>
+    <p>扫一扫，分享到微信</p>
+    <div class="wx-qrcode">
+      <img src="//pan.baidu.com/share/qrcode?url=http://yoursite.com/2020/07/11/20200711-java-jvm-cmdtools/" alt="微信分享二维码">
+    </div>
+</div>
+
+<div class="mask js-mask"></div>
+      
+      <div class="clearfix"></div>
+    </div>
   </div>
 </article>
+
   
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2020/07/11/20200711-blog-template-normal/" class="archive-article-date">
-  	<time datetime="2020-07-11T08:51:00.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-07-11</time>
-</a>
+<nav id="article-nav">
+  
+    <a href="/2020/07/12/20200711-java-jvm-jmap/" id="article-nav-newer" class="article-nav-link-wrap">
+      <i class="icon-circle-left"></i>
+      <div class="article-nav-title">
+        
+          20200711-java-jvm-jmap
+        
+      </div>
+    </a>
+  
+  
+    <a href="/2020/07/11/20200711-blog-template-normal/" id="article-nav-older" class="article-nav-link-wrap">
+      <div class="article-nav-title">普通博客模板</div>
+      <i class="icon-circle-right"></i>
+    </a>
+  
+</nav>
+
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
         </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2020/07/11/20200711-blog-template-normal/">普通博客模板</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">template</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-	<div class="article-category tagcloud">
-		<i class="icon-book icon"></i>
-		<ul class="article-tag-list">
-			
-        		<li class="article-tag-list-item">
-        			<a href="/categories/blog/" class="article-tag-list-link color5">blog</a>
-        		</li>
-      		
-		</ul>
-	</div>
+        
+        
+    </div>
+</aside>
 
 
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2020/07/11/20200711-blog-template-javadebug/" class="archive-article-date">
-  	<time datetime="2020-07-11T08:36:43.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-07-11</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2020/07/11/20200711-blog-template-javadebug/">问题博客模板-Java</a>
-    </h1>
-  
 
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">template</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-	<div class="article-category tagcloud">
-		<i class="icon-book icon"></i>
-		<ul class="article-tag-list">
-			
-        		<li class="article-tag-list-item">
-        			<a href="/categories/blog/" class="article-tag-list-link color5">blog</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2020/07/09/20200709-java-jvm/" class="archive-article-date">
-  	<time datetime="2020-07-09T08:51:31.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-07-09</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2020/07/09/20200709-java-jvm/">记一次线上 OOM Debug过程</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">JVM</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-	<div class="article-category tagcloud">
-		<i class="icon-book icon"></i>
-		<ul class="article-tag-list">
-			
-        		<li class="article-tag-list-item">
-        			<a href="/categories/Java/" class="article-tag-list-link color5">Java</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
   
   
-    </div></section>
   
 
-    
+  
+
+  
+
+  
 
 
           </div>
@@ -445,8 +393,8 @@
 	var yiliaConfig = {
 		mathjax: false,
 		isHome: false,
-		isPost: false,
-		isArchive: true,
+		isPost: true,
+		isArchive: false,
 		isTag: false,
 		isCategory: false,
 		open_in_new: false,
