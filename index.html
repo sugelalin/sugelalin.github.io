@@ -155,6 +155,127 @@
           <div id="js-content" class="content-ll">
             
   
+    <article id="post-20200819-java-base64" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2020/08/19/20200819-java-base64/">字符串 Base64加密问题</a>
+    </h1>
+  
+
+        
+        <a href="/2020/08/19/20200819-java-base64/" class="archive-article-date">
+  	<time datetime="2020-08-19T07:42:18.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-08-19</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="01-前言"><a href="#01-前言" class="headerlink" title="01 前言"></a>01 前言</h2><p>在一次需求开发时，因为需要用到对一组合字符串加解密，并需要再URL中使用这个加密后的字符串，为了方便直接使用的是已经封装好的 公共aes + base64加解密代码，确在解密的时候失败。</p>
+<p>加解密封装：<br>加密：aes-encrypt + base64.encode<br>解密：base64.decode + aes-decrypt</p>
+<p>为了排查和解决这个问题，Google了一些方法，下面是我的探索过程。</p>
+<h2 id="02-正文"><a href="#02-正文" class="headerlink" title="02 正文"></a>02 正文</h2><h3 id="发现问题"><a href="#发现问题" class="headerlink" title="发现问题"></a>发现问题</h3><p>首先是来自于测试报的bug，说我这个功能有问题。然后把他的case过了一遍，果然失败了，通过日志发现是aes解密的时候失败了直接NPE。</p>
+<p>这个时候我当然是一脸无奈（懵逼），毕竟在开发环境测过是没有问题的。然后开始排除。</p>
+<h3 id="排查"><a href="#排查" class="headerlink" title="排查"></a>排查</h3><p>当我再次尝试复现时，通过打了一些断点log（测试环境，建议有条件还是直接debug来的快），发现加密后的字符串和解密时传过来的是不一样的。</p>
+<p>加密后的字符串 str=”aaa+bbbddd”在解密时收到的是str=”aaa bbbccc”。这时候突然想起浏览器在处理URL的时候会将一些特殊字符 比如 “ + / &amp; @” 等转码，然后自己将转码前的字符串拼接到URL后，复制浏览器地址栏回车。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">#回车前</span><br><span class="line">https:&#x2F;&#x2F;juejin.im&#x2F;?name&#x3D;aaa+bbb&#x2F;ccc&amp;ddd@eee</span><br><span class="line">#回车后</span><br><span class="line">https:&#x2F;&#x2F;juejin.im&#x2F;?name&#x3D;aaa%20bbb%2Fccc&amp;ddd%40eee</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，浏览器将 ‘+’ 转码成了 %20；’/‘ 转码成了 %2F；&amp; 没变；‘@’ 转码成了 %40。</p>
+<p>然后查看 aes加密代码，发现除了aes加密处理，还将代码做了base64.encode。通过 Google查找发现是base64加密的问题，使用base64加密后的字符串会带 ‘+’ 和 ‘/‘ 。</p>
+<p>这时候我可以有三种处理方式：</p>
+<ul>
+<li>换一种加密方式，但根据业务需求，必须是可逆的</li>
+<li>对加密后的字符串的’+’和’/‘进行替换处理</li>
+<li>将加密后的字符串转成纯数字格式 </li>
+<li>将加密后的字符串使用 URLEncode转码</li>
+</ul>
+<p>果断选择了第二种处理方式。 </p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//加密后字符串处理</span></span><br><span class="line">str.replaceAll(<span class="string">"+"</span>,<span class="string">"-"</span>);</span><br><span class="line">str.replaceAll(<span class="string">"/"</span>,<span class="string">"_"</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">//解密前字符串处理</span></span><br><span class="line">str.replaceAll(<span class="string">"-"</span>,<span class="string">"+"</span>);</span><br><span class="line">str.replaceAll(<span class="string">"_"</span>,<span class="string">"/"</span>);</span><br></pre></td></tr></table></figure>
+
+<h3 id="继续探索"><a href="#继续探索" class="headerlink" title="继续探索"></a>继续探索</h3><p>问题是解决了，但这样是不是太麻烦了一点，当然我可以再次封装一下加解密函数。但我总是觉得base64这么常用的字符串转换方法不应该只能如此，于是继续探索。</p>
+<p>我查找了一下base64的加密原理，发现原理在JDK8中 base64有三种加密类型。<br>1、标准base64加密。输出字符串的字节范围在 <code>A-ZA-Z0-9+/</code></p>
+<p>2、URL编码。URLSafe的base64，输出字符串的字节范围在 <code>A-ZA-Z0-9-_</code></p>
+<p>3、MIME编码。输出映射到MIME友好的格式。<br>输出表示在每次不超过76个字符行和使用’\r’后跟一个换行符’\n’回车作为行分隔符。无行隔板的存在是为了使编码的结束输出。</p>
+<p><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200712-java-string-base64-01.jpg" alt="base64-图-01"></p>
+<h3 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h3><p>知道了原理了自然就好办了，况且JDK中还为我们提供了URL编解码的函数</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Base64.getUrlEncoder()</span><br><span class="line">Base64.getUrlDecoder()</span><br></pre></td></tr></table></figure>
+
+<p>于是，在Base64工具类Base64Utils中添加URL编解码函数</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">byte</span>[] decodeURLSafe(String base64) &#123;</span><br><span class="line">    <span class="keyword">return</span> Base64.getUrlDecoder().decode(base64);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">encodeURLSafe</span><span class="params">(<span class="keyword">byte</span>[] source)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> Base64.getUrlEncoder().encodeToString(source);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>然后在AES工具类AESUtils中添加使用URL编解码函数的加解密函数</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">encryptURLSafe</span><span class="params">(String content)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        Cipher cipher = Cipher.getInstance(PKCSXPADDING);</span><br><span class="line">        cipher.init(Cipher.ENCRYPT_MODE, DEFAULT_KEY);</span><br><span class="line">        <span class="keyword">byte</span>[] result = cipher.doFinal(content.getBytes(StandardCharsets.UTF_8.name()));</span><br><span class="line">        <span class="keyword">return</span> Base64Utils.encodeURLSafe(result);</span><br><span class="line">    &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">decryptURLSafe</span><span class="params">(String content)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        Cipher cipher = Cipher.getInstance(PKCSXPADDING);</span><br><span class="line">        cipher.init(Cipher.DECRYPT_MODE, DEFAULT_KEY);</span><br><span class="line">        <span class="keyword">byte</span>[] result = cipher.doFinal(Base64Utils.decodeURLSafe(content));</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> String(result);</span><br><span class="line">    &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="03-总结"><a href="#03-总结" class="headerlink" title="03 总结"></a>03 总结</h2><p>对于Base64加密，我们可以根据不用的使用场景选择不同的加密方式。</p>
+<h2 id="04-参考链接"><a href="#04-参考链接" class="headerlink" title="04 参考链接"></a>04 参考链接</h2><p><a href="https://www.cnblogs.com/kjgym/p/11578023.html" target="_blank" rel="noopener">https://www.cnblogs.com/kjgym/p/11578023.html</a></p>
+
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color2">Base64</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+	<div class="article-category tagcloud">
+		<i class="icon-book icon"></i>
+		<ul class="article-tag-list">
+			
+        		<li class="article-tag-list-item">
+        			<a href="/categories/Java/" class="article-tag-list-link color5">Java</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="/2020/08/19/20200819-java-base64/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
     <article id="post-20200711-java-jvm-jmap" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -162,7 +283,7 @@
         
   
     <h1 itemprop="name">
-      <a class="article-title" href="/2020/07/12/20200711-java-jvm-jmap/">20200711-java-jvm-jmap</a>
+      <a class="article-title" href="/2020/07/12/20200711-java-jvm-jmap/">jmap 为什么会触发 FULL GC</a>
     </h1>
   
 
@@ -183,11 +304,12 @@
 <p>在JMap中搜索 LIVE_HISTO_OPTION 即 ”-histo:live“ 可以发现，它和 ”-histo“  区别是 调用 histo(p1, p2) 是 p2的值不同</p>
 <p><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200712-jvm-jmap-02.jpg" alt="jmap-图-2"></p>
 <p>跟进查看 histo 方法，发现在调用heapHisto 方法是参数有变化</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">histo</span><span class="params">(String var0, <span class="keyword">boolean</span> var1)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">    VirtualMachine var2 = attach(var0);</span><br><span class="line">    InputStream var3 = ((HotSpotVirtualMachine)var2).heapHisto(<span class="keyword">new</span> Object[] &#123;var1 ? <span class="string">"-live"</span> : <span class="string">"-all"</span>&#125;);</span><br><span class="line">    drain(var2, var3);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">private static void histo(String var0, boolean var1) throws IOException &#123;</span><br><span class="line">    VirtualMachine var2 &#x3D; attach(var0);</span><br><span class="line">    InputStream var3 &#x3D; ((HotSpotVirtualMachine)var2).heapHisto(new Object[] &#123;var1 ? &quot;-live&quot; : &quot;-all&quot;&#125;);</span><br><span class="line">    drain(var2, var3);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>跟进查看 heapHisto 发现这个方法在是 sun.tools.attach.HotSpotVirtualMachine.java 类中。HotSpot就是当前归属于Oracle 公司，世界上使用最广泛的虚拟机。 HotSpotVirtualMachine 类继承的是 VirtualMachine  虚拟机类。</p>
+<p>跟进查看 heapHisto 发现这个方法在是 sun.tools.attach.HotSpotVirtualMachine.java 类中。HotSpot是JDK自带的虚拟机，当前归属于Oracle 公司，是世界上使用最广泛的虚拟机。可以通过 java -version 查看</p>
+<p> HotSpotVirtualMachine 类继承的是 VirtualMachine  虚拟机类。</p>
 <p>在这里我们能看到，像dumpHeap、heapHisto 都被封装 executeCommand 函数调用。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> InputStream <span class="title">dumpHeap</span><span class="params">(Object... var1)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">this</span>.executeCommand(<span class="string">"dumpheap"</span>, var1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> InputStream <span class="title">heapHisto</span><span class="params">(Object... var1)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">this</span>.executeCommand(<span class="string">"inspectheap"</span>, var1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">abstract</span> InputStream <span class="title">execute</span><span class="params">(String var1, Object... var2)</span> <span class="keyword">throws</span> AgentLoadException, IOException</span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> InputStream <span class="title">executeCommand</span><span class="params">(String var1, Object... var2)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">this</span>.execute(var1, var2);</span><br><span class="line">    &#125; <span class="keyword">catch</span> (AgentLoadException var4) &#123;</span><br><span class="line">        <span class="keyword">throw</span> <span class="keyword">new</span> InternalError(<span class="string">"Should not get here"</span>, var4);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">public InputStream dumpHeap(Object... var1) throws IOException &#123;</span><br><span class="line">    return this.executeCommand(&quot;dumpheap&quot;, var1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">public InputStream heapHisto(Object... var1) throws IOException &#123;</span><br><span class="line">    return this.executeCommand(&quot;inspectheap&quot;, var1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">abstract InputStream execute(String var1, Object... var2) throws AgentLoadException, IOException;</span><br><span class="line"></span><br><span class="line">private InputStream executeCommand(String var1, Object... var2) throws IOException &#123;</span><br><span class="line">    try &#123;</span><br><span class="line">        return this.execute(var1, var2);</span><br><span class="line">    &#125; catch (AgentLoadException var4) &#123;</span><br><span class="line">        throw new InternalError(&quot;Should not get here&quot;, var4);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
 <p>executeCommand 来自抽象的 execute方法，它的实现类在 sun.tools.attach.BsdVirtualMachine.java 中，BsdVirtualMachine是HotSpotVirtualMachine 的子类，在其虚拟机功能的基础上实现了一些socket读、写等操作，可以实现与虚拟机的功能调用。</p>
 <p>到此，SDK部分就已经结束了，接下来我们看一下 HotSpot 的源码。</p>
@@ -201,6 +323,7 @@
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">jmap -histo:live pid </span><br><span class="line">jmap -dump:live,file=dump_001.bin pid</span><br></pre></td></tr></table></figure>
 
 <p>个人分析，这大概是因为需要过滤活跃的对象，而活跃的对象是时刻都在发生变化的，为了快速分离，jvm最简单的方法就是通过一次FULL GC清理掉不活跃的对象，然后导出。</p>
+<h2 id="04-参考链接"><a href="#04-参考链接" class="headerlink" title="04 参考链接"></a>04 参考链接</h2><p><a href="https://www.iteye.com/blog/langzi-xl-798905" target="_blank" rel="noopener">https://www.iteye.com/blog/langzi-xl-798905</a><br><a href="https://my.oschina.net/u/2518341/blog/1931088" target="_blank" rel="noopener">https://my.oschina.net/u/2518341/blog/1931088</a><br><a href="https://github.com/openjdk/jdk" target="_blank" rel="noopener">https://github.com/openjdk/jdk</a></p>
 
       
 
@@ -1265,121 +1388,6 @@
 
 
   
-    <article id="post-20200609-devops-promethues-01" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2020/06/09/20200609-devops-promethues-01/">Prometheus--（一）简介</a>
-    </h1>
-  
-
-        
-        <a href="/2020/06/09/20200609-devops-promethues-01/" class="archive-article-date">
-  	<time datetime="2020-06-09T14:13:57.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-06-09</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="概览"><a href="#概览" class="headerlink" title="概览"></a>概览</h2><p>普罗米修斯是一个开源系统监控和警报工具包，最初是在SoundCloud构建的。自2012年成立以来，许多公司和组织都采用了普罗米修斯，该项目拥有一个非常活跃的开发人员和用户社区。它现在是一个独立的开源项目，独立于任何公司进行维护。为了强调这一点，并澄清项目的治理结构，普罗米修斯于2016年加入了云原生计算基金会，成为继Kubernetes之后的第二个托管项目。</p>
-<h3 id="特性"><a href="#特性" class="headerlink" title="特性"></a>特性</h3><ul>
-<li>用度量名和键值对识别时间序列数据的多维数据模型</li>
-<li>PromQL，一种多维灵活的查询语言</li>
-<li>不依赖分布式存储；单服务器节点，服务自治</li>
-<li>通过HTTP上的pull模型进行时间序列收集</li>
-<li>通过中间网关可支持推送时间序列</li>
-<li>通过服务发现或静态配置发现目标</li>
-<li>支持多种图形和仪表板</li>
-</ul>
-<h3 id="组件"><a href="#组件" class="headerlink" title="组件"></a>组件</h3><p>普罗米修斯生态系统由多个组件组成，其中许多组件是可选的：</p>
-<ul>
-<li>普罗米修斯服务，用于收集和存储时间序列数据</li>
-<li>客户端库，用于检测应用程序代码</li>
-<li>推送网关，支持短期作业</li>
-<li>支持特定出口，如HAProxy、StatsD、Graphite等。</li>
-<li>处理警报的警报管理器</li>
-<li>各种支撑工具</li>
-</ul>
-<h3 id="架构"><a href="#架构" class="headerlink" title="架构"></a>架构</h3><p>此图说明了普罗米修斯的建筑及其生态系统的一些组成部分：</p>
-<p><img src="https://prometheus.io/assets/architecture.png" alt="架构图"></p>
-<p>普罗米修斯直接或通过短生命作业的中间推送网关从检测作业中获取度量。</p>
-<p>它在本地存储所有刮取的样本，并在此数据上运行规则，以便从现有数据中聚合和记录新的时间序列或生成警报。可以使用Grafana等UI工具，将收集的数据可视化。</p>
-<h3 id="优点："><a href="#优点：" class="headerlink" title="优点："></a>优点：</h3><p>普罗米修斯对于记录任何纯数字时间序列都很有效。它既适合以机器为中心的监视，也适合高度动态的面向服务的体系结构的监视。在微服务的世界里，它对多维数据收集和查询的支持是一个特别的优势。</p>
-<p>普罗米修斯是为可靠性而设计的，它是一个系统，可以让你在停电时快速诊断问题。每台普罗米修斯服务器都是独立的，不依赖于网络存储或其他远程服务。当基础设施的其他部分损坏时，可以依赖它，而不需要设置广泛的基础设施来使用它。</p>
-<h3 id="缺点："><a href="#缺点：" class="headerlink" title="缺点："></a>缺点：</h3><p>普罗米修斯重视可靠性。即使在出现故障的情况下，你也可以始终查看系统的可用统计信息。如果你需要100%的准确度，例如按请求计费，普罗米修斯不是一个好的选择，因为收集的数据可能不够详细和完整。在这种情况下，最好使用其他系统来收集和分析计费数据，并使用普罗米修斯进行其余的监控。</p>
-<p>如果做日志监控，建议使用ELK；如果对时序性有强烈的要求，可以使用Influxdb+Grafana做实时监控。</p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">Monitor</a>
-        		</li>
-      		 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color1">Prometheus</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-	<div class="article-category tagcloud">
-		<i class="icon-book icon"></i>
-		<ul class="article-tag-list">
-			
-        		<li class="article-tag-list-item">
-        			<a href="/categories/DevOps/" class="article-tag-list-link color2">DevOps</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="/2020/06/09/20200609-devops-promethues-01/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
   
     <nav id="page-nav">
       <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><a class="extend next" rel="next" href="/page/2/">Next &amp;raquo;</a>
@@ -1486,7 +1494,7 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
               </li>
             
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color4">JVM</a>
+                <a href="javascript:void(0)" class="js-tag color5">hexo</a>
               </li>
             
               <li class="article-tag-list-item">
@@ -1494,7 +1502,11 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
               </li>
             
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color5">hexo</a>
+                <a href="javascript:void(0)" class="js-tag color4">JVM</a>
+              </li>
+            
+              <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color3">Linux命令</a>
               </li>
             
               <li class="article-tag-list-item">
@@ -1502,7 +1514,7 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
               </li>
             
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color3">Linux命令</a>
+                <a href="javascript:void(0)" class="js-tag color2">Base64</a>
               </li>
             
             <div class="clearfix"></div>

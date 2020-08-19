@@ -6,11 +6,11 @@
   <meta name="renderer" content="webkit">
   <meta http-equiv="X-UA-Compatible" content="IE=edge" >
   <link rel="dns-prefetch" href="http://yoursite.com">
-  <title>20200711-java-jvm-jmap | Allen</title>
+  <title>jmap 为什么会触发 FULL GC | Allen</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="description" content="01 前言在一次排查线上问题时，偶然发现 jmap -histo:live 会触发FULL GC，于是为了深入了解，对jmap的原理做了一次探索。 02 正文测试环境Linux CentOS7、jdk8、64位 源码排查我们查看JMap源码 包名：sun.tools.jmap类名：JMap.java 如图我们可以看到有两组参数 在JMap中搜索 LIVE_HISTO_OPTION 即 ”-hist">
 <meta property="og:type" content="article">
-<meta property="og:title" content="20200711-java-jvm-jmap">
+<meta property="og:title" content="jmap 为什么会触发 FULL GC">
 <meta property="og:url" content="http://yoursite.com/2020/07/12/20200711-java-jvm-jmap/index.html">
 <meta property="og:site_name" content="Allen">
 <meta property="og:description" content="01 前言在一次排查线上问题时，偶然发现 jmap -histo:live 会触发FULL GC，于是为了深入了解，对jmap的原理做了一次探索。 02 正文测试环境Linux CentOS7、jdk8、64位 源码排查我们查看JMap源码 包名：sun.tools.jmap类名：JMap.java 如图我们可以看到有两组参数 在JMap中搜索 LIVE_HISTO_OPTION 即 ”-hist">
@@ -20,7 +20,7 @@
 <meta property="og:image" content="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200712-jvm-jmap-03.jpg">
 <meta property="og:image" content="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200712-jvm-jmap-04.jpg">
 <meta property="article:published_time" content="2020-07-12T09:39:10.000Z">
-<meta property="article:modified_time" content="2020-07-12T09:46:20.645Z">
+<meta property="article:modified_time" content="2020-08-19T07:48:20.434Z">
 <meta property="article:author" content="yulin">
 <meta property="article:tag" content="JVM">
 <meta property="article:tag" content="jmap">
@@ -172,7 +172,7 @@
         
   
     <h1 class="article-title" itemprop="name">
-      20200711-java-jvm-jmap
+      jmap 为什么会触发 FULL GC
     </h1>
   
 
@@ -193,11 +193,12 @@
 <p>在JMap中搜索 LIVE_HISTO_OPTION 即 ”-histo:live“ 可以发现，它和 ”-histo“  区别是 调用 histo(p1, p2) 是 p2的值不同</p>
 <p><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200712-jvm-jmap-02.jpg" alt="jmap-图-2"></p>
 <p>跟进查看 histo 方法，发现在调用heapHisto 方法是参数有变化</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">histo</span><span class="params">(String var0, <span class="keyword">boolean</span> var1)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">    VirtualMachine var2 = attach(var0);</span><br><span class="line">    InputStream var3 = ((HotSpotVirtualMachine)var2).heapHisto(<span class="keyword">new</span> Object[] &#123;var1 ? <span class="string">"-live"</span> : <span class="string">"-all"</span>&#125;);</span><br><span class="line">    drain(var2, var3);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">private static void histo(String var0, boolean var1) throws IOException &#123;</span><br><span class="line">    VirtualMachine var2 &#x3D; attach(var0);</span><br><span class="line">    InputStream var3 &#x3D; ((HotSpotVirtualMachine)var2).heapHisto(new Object[] &#123;var1 ? &quot;-live&quot; : &quot;-all&quot;&#125;);</span><br><span class="line">    drain(var2, var3);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>跟进查看 heapHisto 发现这个方法在是 sun.tools.attach.HotSpotVirtualMachine.java 类中。HotSpot就是当前归属于Oracle 公司，世界上使用最广泛的虚拟机。 HotSpotVirtualMachine 类继承的是 VirtualMachine  虚拟机类。</p>
+<p>跟进查看 heapHisto 发现这个方法在是 sun.tools.attach.HotSpotVirtualMachine.java 类中。HotSpot是JDK自带的虚拟机，当前归属于Oracle 公司，是世界上使用最广泛的虚拟机。可以通过 java -version 查看</p>
+<p> HotSpotVirtualMachine 类继承的是 VirtualMachine  虚拟机类。</p>
 <p>在这里我们能看到，像dumpHeap、heapHisto 都被封装 executeCommand 函数调用。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> InputStream <span class="title">dumpHeap</span><span class="params">(Object... var1)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">this</span>.executeCommand(<span class="string">"dumpheap"</span>, var1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> InputStream <span class="title">heapHisto</span><span class="params">(Object... var1)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">this</span>.executeCommand(<span class="string">"inspectheap"</span>, var1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">abstract</span> InputStream <span class="title">execute</span><span class="params">(String var1, Object... var2)</span> <span class="keyword">throws</span> AgentLoadException, IOException</span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> InputStream <span class="title">executeCommand</span><span class="params">(String var1, Object... var2)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">this</span>.execute(var1, var2);</span><br><span class="line">    &#125; <span class="keyword">catch</span> (AgentLoadException var4) &#123;</span><br><span class="line">        <span class="keyword">throw</span> <span class="keyword">new</span> InternalError(<span class="string">"Should not get here"</span>, var4);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">public InputStream dumpHeap(Object... var1) throws IOException &#123;</span><br><span class="line">    return this.executeCommand(&quot;dumpheap&quot;, var1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">public InputStream heapHisto(Object... var1) throws IOException &#123;</span><br><span class="line">    return this.executeCommand(&quot;inspectheap&quot;, var1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">abstract InputStream execute(String var1, Object... var2) throws AgentLoadException, IOException;</span><br><span class="line"></span><br><span class="line">private InputStream executeCommand(String var1, Object... var2) throws IOException &#123;</span><br><span class="line">    try &#123;</span><br><span class="line">        return this.execute(var1, var2);</span><br><span class="line">    &#125; catch (AgentLoadException var4) &#123;</span><br><span class="line">        throw new InternalError(&quot;Should not get here&quot;, var4);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
 <p>executeCommand 来自抽象的 execute方法，它的实现类在 sun.tools.attach.BsdVirtualMachine.java 中，BsdVirtualMachine是HotSpotVirtualMachine 的子类，在其虚拟机功能的基础上实现了一些socket读、写等操作，可以实现与虚拟机的功能调用。</p>
 <p>到此，SDK部分就已经结束了，接下来我们看一下 HotSpot 的源码。</p>
@@ -211,6 +212,7 @@
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">jmap -histo:live pid </span><br><span class="line">jmap -dump:live,file=dump_001.bin pid</span><br></pre></td></tr></table></figure>
 
 <p>个人分析，这大概是因为需要过滤活跃的对象，而活跃的对象是时刻都在发生变化的，为了快速分离，jvm最简单的方法就是通过一次FULL GC清理掉不活跃的对象，然后导出。</p>
+<h2 id="04-参考链接"><a href="#04-参考链接" class="headerlink" title="04 参考链接"></a>04 参考链接</h2><p><a href="https://www.iteye.com/blog/langzi-xl-798905" target="_blank" rel="noopener">https://www.iteye.com/blog/langzi-xl-798905</a><br><a href="https://my.oschina.net/u/2518341/blog/1931088" target="_blank" rel="noopener">https://my.oschina.net/u/2518341/blog/1931088</a><br><a href="https://github.com/openjdk/jdk" target="_blank" rel="noopener">https://github.com/openjdk/jdk</a></p>
 
       
 
@@ -329,6 +331,15 @@
 
   
 <nav id="article-nav">
+  
+    <a href="/2020/08/19/20200819-java-base64/" id="article-nav-newer" class="article-nav-link-wrap">
+      <i class="icon-circle-left"></i>
+      <div class="article-nav-title">
+        
+          字符串 Base64加密问题
+        
+      </div>
+    </a>
   
   
     <a href="/2020/07/11/20200711-java-jvm-cmdtools/" id="article-nav-older" class="article-nav-link-wrap">
@@ -467,7 +478,7 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
               </li>
             
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color4">JVM</a>
+                <a href="javascript:void(0)" class="js-tag color5">hexo</a>
               </li>
             
               <li class="article-tag-list-item">
@@ -475,7 +486,11 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
               </li>
             
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color5">hexo</a>
+                <a href="javascript:void(0)" class="js-tag color4">JVM</a>
+              </li>
+            
+              <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color3">Linux命令</a>
               </li>
             
               <li class="article-tag-list-item">
@@ -483,7 +498,7 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
               </li>
             
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color3">Linux命令</a>
+                <a href="javascript:void(0)" class="js-tag color2">Base64</a>
               </li>
             
             <div class="clearfix"></div>

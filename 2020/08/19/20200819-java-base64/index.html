@@ -6,14 +6,21 @@
   <meta name="renderer" content="webkit">
   <meta http-equiv="X-UA-Compatible" content="IE=edge" >
   <link rel="dns-prefetch" href="http://yoursite.com">
-  <title>Tag: JVM | Allen</title>
+  <title>字符串 Base64加密问题 | Allen</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta property="og:type" content="website">
-<meta property="og:title" content="Allen">
-<meta property="og:url" content="http://yoursite.com/tags/JVM/index.html">
+  <meta name="description" content="01 前言在一次需求开发时，因为需要用到对一组合字符串加解密，并需要再URL中使用这个加密后的字符串，为了方便直接使用的是已经封装好的 公共aes + base64加解密代码，确在解密的时候失败。 加解密封装：加密：aes-encrypt + base64.encode解密：base64.decode + aes-decrypt 为了排查和解决这个问题，Google了一些方法，下面是我的探索过程。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="字符串 Base64加密问题">
+<meta property="og:url" content="http://yoursite.com/2020/08/19/20200819-java-base64/index.html">
 <meta property="og:site_name" content="Allen">
+<meta property="og:description" content="01 前言在一次需求开发时，因为需要用到对一组合字符串加解密，并需要再URL中使用这个加密后的字符串，为了方便直接使用的是已经封装好的 公共aes + base64加解密代码，确在解密的时候失败。 加解密封装：加密：aes-encrypt + base64.encode解密：base64.decode + aes-decrypt 为了排查和解决这个问题，Google了一些方法，下面是我的探索过程。">
+<meta property="og:image" content="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200712-java-string-base64-01.jpg">
+<meta property="article:published_time" content="2020-08-19T07:42:18.000Z">
+<meta property="article:modified_time" content="2020-08-19T07:47:39.103Z">
 <meta property="article:author" content="yulin">
+<meta property="article:tag" content="Base64">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200712-java-string-base64-01.jpg">
   
     <link rel="alternative" href="/atom.xml" title="Allen" type="application/atom+xml">
   
@@ -153,52 +160,104 @@
             <canvas data-colors="#eaeaea" data-sectionHeight="100" data-contentId="js-content" id="myCanvas1" class="anm-canvas"></canvas>
           </div>
           <div id="js-content" class="content-ll">
-            
-  
-  
+            <article id="post-20200819-java-base64" class="article article-type-post " itemscope itemprop="blogPost">
+  <div class="article-inner">
     
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      字符串 Base64加密问题
+    </h1>
+  
+
+        
+        <a href="/2020/08/19/20200819-java-base64/" class="archive-article-date">
+  	<time datetime="2020-08-19T07:42:18.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-08-19</time>
+</a>
+        
+      </header>
     
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="01-前言"><a href="#01-前言" class="headerlink" title="01 前言"></a>01 前言</h2><p>在一次需求开发时，因为需要用到对一组合字符串加解密，并需要再URL中使用这个加密后的字符串，为了方便直接使用的是已经封装好的 公共aes + base64加解密代码，确在解密的时候失败。</p>
+<p>加解密封装：<br>加密：aes-encrypt + base64.encode<br>解密：base64.decode + aes-decrypt</p>
+<p>为了排查和解决这个问题，Google了一些方法，下面是我的探索过程。</p>
+<h2 id="02-正文"><a href="#02-正文" class="headerlink" title="02 正文"></a>02 正文</h2><h3 id="发现问题"><a href="#发现问题" class="headerlink" title="发现问题"></a>发现问题</h3><p>首先是来自于测试报的bug，说我这个功能有问题。然后把他的case过了一遍，果然失败了，通过日志发现是aes解密的时候失败了直接NPE。</p>
+<p>这个时候我当然是一脸无奈（懵逼），毕竟在开发环境测过是没有问题的。然后开始排除。</p>
+<h3 id="排查"><a href="#排查" class="headerlink" title="排查"></a>排查</h3><p>当我再次尝试复现时，通过打了一些断点log（测试环境，建议有条件还是直接debug来的快），发现加密后的字符串和解密时传过来的是不一样的。</p>
+<p>加密后的字符串 str=”aaa+bbbddd”在解密时收到的是str=”aaa bbbccc”。这时候突然想起浏览器在处理URL的时候会将一些特殊字符 比如 “ + / &amp; @” 等转码，然后自己将转码前的字符串拼接到URL后，复制浏览器地址栏回车。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">#回车前</span><br><span class="line">https:&#x2F;&#x2F;juejin.im&#x2F;?name&#x3D;aaa+bbb&#x2F;ccc&amp;ddd@eee</span><br><span class="line">#回车后</span><br><span class="line">https:&#x2F;&#x2F;juejin.im&#x2F;?name&#x3D;aaa%20bbb%2Fccc&amp;ddd%40eee</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，浏览器将 ‘+’ 转码成了 %20；’/‘ 转码成了 %2F；&amp; 没变；‘@’ 转码成了 %40。</p>
+<p>然后查看 aes加密代码，发现除了aes加密处理，还将代码做了base64.encode。通过 Google查找发现是base64加密的问题，使用base64加密后的字符串会带 ‘+’ 和 ‘/‘ 。</p>
+<p>这时候我可以有三种处理方式：</p>
+<ul>
+<li>换一种加密方式，但根据业务需求，必须是可逆的</li>
+<li>对加密后的字符串的’+’和’/‘进行替换处理</li>
+<li>将加密后的字符串转成纯数字格式 </li>
+<li>将加密后的字符串使用 URLEncode转码</li>
+</ul>
+<p>果断选择了第二种处理方式。 </p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//加密后字符串处理</span></span><br><span class="line">str.replaceAll(<span class="string">"+"</span>,<span class="string">"-"</span>);</span><br><span class="line">str.replaceAll(<span class="string">"/"</span>,<span class="string">"_"</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">//解密前字符串处理</span></span><br><span class="line">str.replaceAll(<span class="string">"-"</span>,<span class="string">"+"</span>);</span><br><span class="line">str.replaceAll(<span class="string">"_"</span>,<span class="string">"/"</span>);</span><br></pre></td></tr></table></figure>
+
+<h3 id="继续探索"><a href="#继续探索" class="headerlink" title="继续探索"></a>继续探索</h3><p>问题是解决了，但这样是不是太麻烦了一点，当然我可以再次封装一下加解密函数。但我总是觉得base64这么常用的字符串转换方法不应该只能如此，于是继续探索。</p>
+<p>我查找了一下base64的加密原理，发现原理在JDK8中 base64有三种加密类型。<br>1、标准base64加密。输出字符串的字节范围在 <code>A-ZA-Z0-9+/</code></p>
+<p>2、URL编码。URLSafe的base64，输出字符串的字节范围在 <code>A-ZA-Z0-9-_</code></p>
+<p>3、MIME编码。输出映射到MIME友好的格式。<br>输出表示在每次不超过76个字符行和使用’\r’后跟一个换行符’\n’回车作为行分隔符。无行隔板的存在是为了使编码的结束输出。</p>
+<p><img src="http://wylbucket20190621.oss-cn-beijing.aliyuncs.com/photo/blog/20200712-java-string-base64-01.jpg" alt="base64-图-01"></p>
+<h3 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h3><p>知道了原理了自然就好办了，况且JDK中还为我们提供了URL编解码的函数</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Base64.getUrlEncoder()</span><br><span class="line">Base64.getUrlDecoder()</span><br></pre></td></tr></table></figure>
+
+<p>于是，在Base64工具类Base64Utils中添加URL编解码函数</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">byte</span>[] decodeURLSafe(String base64) &#123;</span><br><span class="line">    <span class="keyword">return</span> Base64.getUrlDecoder().decode(base64);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">encodeURLSafe</span><span class="params">(<span class="keyword">byte</span>[] source)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> Base64.getUrlEncoder().encodeToString(source);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>然后在AES工具类AESUtils中添加使用URL编解码函数的加解密函数</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">encryptURLSafe</span><span class="params">(String content)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        Cipher cipher = Cipher.getInstance(PKCSXPADDING);</span><br><span class="line">        cipher.init(Cipher.ENCRYPT_MODE, DEFAULT_KEY);</span><br><span class="line">        <span class="keyword">byte</span>[] result = cipher.doFinal(content.getBytes(StandardCharsets.UTF_8.name()));</span><br><span class="line">        <span class="keyword">return</span> Base64Utils.encodeURLSafe(result);</span><br><span class="line">    &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">decryptURLSafe</span><span class="params">(String content)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        Cipher cipher = Cipher.getInstance(PKCSXPADDING);</span><br><span class="line">        cipher.init(Cipher.DECRYPT_MODE, DEFAULT_KEY);</span><br><span class="line">        <span class="keyword">byte</span>[] result = cipher.doFinal(Base64Utils.decodeURLSafe(content));</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> String(result);</span><br><span class="line">    &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="03-总结"><a href="#03-总结" class="headerlink" title="03 总结"></a>03 总结</h2><p>对于Base64加密，我们可以根据不用的使用场景选择不同的加密方式。</p>
+<h2 id="04-参考链接"><a href="#04-参考链接" class="headerlink" title="04 参考链接"></a>04 参考链接</h2><p><a href="https://www.cnblogs.com/kjgym/p/11578023.html" target="_blank" rel="noopener">https://www.cnblogs.com/kjgym/p/11578023.html</a></p>
+
+      
+
+      
+        <div class="page-reward">
+          <a href="javascript:;" class="page-reward-btn tooltip-top">
+            <div class="tooltip tooltip-east">
+            <span class="tooltip-item">
+              赏
+            </span>
+            <span class="tooltip-content">
+              <span class="tooltip-text">
+                <span class="tooltip-inner">
+                  <p class="reward-p"><i class="icon icon-quo-left"></i>承蒙打赏<i class="icon icon-quo-right"></i></p>
+                  <div class="reward-box">
+                    
+                    
+                  </div>
+                </span>
+              </span>
+            </span>
+          </div>
+          </a>
+        </div>
+      
+    </div>
+    <div class="article-info article-info-index">
       
       
-      <section class="archives-wrap">
-        <div class="archive-year-wrap">
-          <a href="/archives/2020" class="archive-year">2020</a>
-        </div>
-        <div class="archives">
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2020/07/12/20200711-java-jvm-jmap/" class="archive-article-date">
-  	<time datetime="2020-07-12T09:39:10.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-07-12</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2020/07/12/20200711-java-jvm-jmap/">jmap 为什么会触发 FULL GC</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
 	<div class="article-tag tagcloud">
 		<i class="icon-price-tags icon"></i>
 		<ul class="article-tag-list">
 			 
         		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">JVM</a>
-        		</li>
-      		 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color5">jmap</a>
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color2">Base64</a>
         		</li>
       		
 		</ul>
 	</div>
 
-          
+      
 	<div class="article-category tagcloud">
 		<i class="icon-book icon"></i>
 		<ul class="article-tag-list">
@@ -211,119 +270,104 @@
 	</div>
 
 
+      
+
+      
+        
+<div class="share-btn share-icons tooltip-left">
+  <div class="tooltip tooltip-east">
+    <span class="tooltip-item">
+      <a href="javascript:;" class="share-sns share-outer">
+        <i class="icon icon-share"></i>
+      </a>
+    </span>
+    <span class="tooltip-content">
+      <div class="share-wrap">
+        <div class="share-icons">
+          <a class="weibo share-sns" href="javascript:;" data-type="weibo">
+            <i class="icon icon-weibo"></i>
+          </a>
+          <a class="weixin share-sns wxFab" href="javascript:;" data-type="weixin">
+            <i class="icon icon-weixin"></i>
+          </a>
+          <a class="qq share-sns" href="javascript:;" data-type="qq">
+            <i class="icon icon-qq"></i>
+          </a>
+          <a class="douban share-sns" href="javascript:;" data-type="douban">
+            <i class="icon icon-douban"></i>
+          </a>
+          <a class="qzone share-sns" href="javascript:;" data-type="qzone">
+            <i class="icon icon-qzone"></i>
+          </a>
+          <a class="facebook share-sns" href="javascript:;" data-type="facebook">
+            <i class="icon icon-facebook"></i>
+          </a>
+          <a class="twitter share-sns" href="javascript:;" data-type="twitter">
+            <i class="icon icon-twitter"></i>
+          </a>
+          <a class="google share-sns" href="javascript:;" data-type="google">
+            <i class="icon icon-google"></i>
+          </a>
         </div>
-        <div class="clearfix"></div>
-    </header>
+      </div>
+    </span>
+  </div>
+</div>
+
+<div class="page-modal wx-share js-wx-box">
+    <a class="close js-modal-close" href="javascript:;"><i class="icon icon-close"></i></a>
+    <p>扫一扫，分享到微信</p>
+    <div class="wx-qrcode">
+      <img src="//pan.baidu.com/share/qrcode?url=http://yoursite.com/2020/08/19/20200819-java-base64/" alt="微信分享二维码">
+    </div>
+</div>
+
+<div class="mask js-mask"></div>
+      
+      <div class="clearfix"></div>
+    </div>
   </div>
 </article>
+
   
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2020/07/11/20200711-java-jvm-cmdtools/" class="archive-article-date">
-  	<time datetime="2020-07-11T09:03:57.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-07-11</time>
-</a>
+<nav id="article-nav">
+  
+  
+    <a href="/2020/07/12/20200711-java-jvm-jmap/" id="article-nav-older" class="article-nav-link-wrap">
+      <div class="article-nav-title">jmap 为什么会触发 FULL GC</div>
+      <i class="icon-circle-right"></i>
+    </a>
+  
+</nav>
+
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
         </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2020/07/11/20200711-java-jvm-cmdtools/">JVM 命令行工具</a>
-    </h1>
-  
-
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">JVM</a>
-        		</li>
-      		 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color3">Linux命令</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-	<div class="article-category tagcloud">
-		<i class="icon-book icon"></i>
-		<ul class="article-tag-list">
-			
-        		<li class="article-tag-list-item">
-        			<a href="/categories/Java/" class="article-tag-list-link color5">Java</a>
-        		</li>
-      		
-		</ul>
-	</div>
+        
+        
+    </div>
+</aside>
 
 
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      	<div class="article-meta">
-	      	<a href="/2020/07/09/20200709-java-jvm/" class="archive-article-date">
-  	<time datetime="2020-07-09T08:51:31.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-07-09</time>
-</a>
-        </div>
-    	 
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2020/07/09/20200709-java-jvm/">记一次线上 OOM Debug过程</a>
-    </h1>
-  
 
-        <div class="article-info info-on-right">
-          
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">JVM</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-          
-	<div class="article-category tagcloud">
-		<i class="icon-book icon"></i>
-		<ul class="article-tag-list">
-			
-        		<li class="article-tag-list-item">
-        			<a href="/categories/Java/" class="article-tag-list-link color5">Java</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-
-        </div>
-        <div class="clearfix"></div>
-    </header>
-  </div>
-</article>
   
   
-    </div></section>
   
 
-    
+  
+
+  
+
+  
 
 
           </div>
@@ -347,9 +391,9 @@
 	var yiliaConfig = {
 		mathjax: false,
 		isHome: false,
-		isPost: false,
+		isPost: true,
 		isArchive: false,
-		isTag: true,
+		isTag: false,
 		isCategory: false,
 		open_in_new: false,
 		toc_hide_index: true,
